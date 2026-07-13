@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
@@ -188,6 +189,14 @@ public class FileService {
 
     @Transactional
     public void renameFile(Long fileId, Long userId, String newName) {
+        /**
+         * 重命名
+         * 把 指定文件/目录 重命名
+         * 
+         * @Param fileId 指定文件/目录 ID
+         * @Param userId 用户 ID
+         * @Param newName 新名字
+         */
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
         UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
@@ -252,11 +261,103 @@ public class FileService {
         }
     }
 
-    public void moveFile(Long fileId, Long userId, Long targetFolderId) {
-        // 实现 移动文件 功能
-        // 需注意，不能把文件移动到自己的子目录中
+    @Transactional
+    public void moveFile(Long sourceId, Long userId, Long targetFolderId) {
+        /**
+         * 把被移动目录移动到指定目录中
+         * 需注意，不能把文件移动到自己的子目录中
+         * 
+         * @Param sourceId 被移动目录id
+         * @Param userId 目录所有者id
+         * @Param targetFolderId 目标目录
+         */
 
-        
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
+        UserFile source = userFileRepository.findByIdAndOwner(sourceId, owner)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到文件"));
+
+        String relativePath;
+        if (targetFolderId != null) {
+            // 目标目录归属校验
+            UserFile targetFolder = userFileRepository.findByIdAndOwner(targetFolderId, owner)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标文件夹"));
+
+            // 定义真实磁盘路径
+            relativePath = targetFolder.getFilePath() + "/" + source.getFilename();
+        } else {
+            relativePath = source.getFilename();
+        }
+
+        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(source.getFilename(), owner, targetFolderId))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标目录下有同名文件/目录");
+
+        if (source.isFolder() && targetFolderId != null && isDescendantOf(owner, sourceId, targetFolderId))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "不能移动到子目录中");
+
+        // 递归更新子文件
+        if (source.isFolder()) {
+            List<UserFile> allChild = new ArrayList<>();
+            collectSubdirectories(owner, sourceId, allChild);
+
+            String oldPath = source.getFilePath();
+
+            for (UserFile child : allChild) {
+                String newPath = relativePath + child.getFilePath().substring(oldPath.length());
+                child.setFilePath(newPath);
+                userFileRepository.save(child);
+            }
+        }
+        String oldPath = source.getFilePath();
+        // 更新数据库信息
+        source.setParentFolderId(targetFolderId);
+        source.setFilePath(relativePath);
+        userFileRepository.save(source);
+
+        try {
+            // 移动真实文件
+            Files.move(storageService.validatePath(userId, oldPath),
+                    storageService.validatePath(userId, relativePath));
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "移动文件失败");
+        }
+
+    }
+
+    public UserFile getFileDetail(Long fileId, Long userId) {
+        /**
+         * 获取文件元数据
+         * 例如：
+         * 文件名：text.txt
+         * 大小：10 KB
+         * 类型：text/plain
+         * 创建时间：2026-09-29 13:00
+         * 修改时间：2026-09-30 12:00
+         * 
+         * @Param userId // 用户 ID
+         * @Param fileId // 文件 ID
+         */
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
+        UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到文件"));
+
+        return uf;
+
+    }
+
+    public List<UserFile> searchFiles(Long userId, String keyword) {
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
+        return userFileRepository.findByOwnerAndFilenameContaining(owner, keyword);
+    }
+
+    @Transactional
+    public void batchDelete(Set<Long> ids, Long userId) {
+        for (Long fileId : ids) {
+            this.deleteFile(fileId, userId);
+        }
+
     }
 
     private void collectSubdirectories(User owner, Long folderId, List<UserFile> allFiles) {
@@ -271,6 +372,33 @@ public class FileService {
                 collectSubdirectories(owner, child.getId(), allFiles);
             }
         }
+
+    }
+
+    private boolean isDescendantOf(User owner, Long folderId, Long targetFolderId) {
+        /**
+         * 检查目标目录是否为被移动目录的子目录
+         * 从 targetFolder 往上追溯 parentFolder 链
+         * 如果遇到了 folder 就说明目标目录是被移动目录的子目录
+         * 
+         * @Param owner 当前用户
+         * @Param folderId 被移动目录的id
+         * @Param targetFolderId 目标目录的id
+         *        return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
+         **/
+
+        Long currentFolder = targetFolderId;
+        while (currentFolder != null) {
+            if (currentFolder.equals(folderId))
+                return true;
+
+            UserFile nextFolder = userFileRepository.findByIdAndOwner(currentFolder, owner).orElse(null);
+            if (nextFolder == null)
+                break;
+            currentFolder = nextFolder.getParentFolderId();
+        }
+
+        return false;
 
     }
 

@@ -23,9 +23,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table( name = "files")
+@Table(name = "files")
 @EntityListeners(AuditingEntityListener.class)
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 
@@ -33,23 +34,23 @@ public class UserFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false)
     private String filename;
 
     @Column(nullable = false)
-    private String filePath;
-    
+    private String filePath; // 存储文件全路径 真实文件路径+文件名
+
     @Column(nullable = false)
-    private long fileSize;              // 字节数（文件大小）
+    private long fileSize; // 字节数（文件大小）
 
-    private String contentType;         // MIME 类型
+    private String contentType; // MIME 类型
 
-    private boolean isFolder = false;           // 分辨是否为文件夹，默认为 false，文件夹设置为 true
+    private boolean isFolder = false; // 分辨是否为文件夹，默认为 false，文件夹设置为 true
 
-    private Long parentFolderId;            // 子目录所属的父级目录， null 为根目录，其他值=所属文件夹 ID
+    private Long parentFolderId; // 子目录所属的父级目录， null 为根目录，其他值=所属文件夹 ID
 
-    @ManyToOne 
+    @ManyToOne
     @JoinColumn(name = "owner_id")
     private User owner;
 
