@@ -1,7 +1,9 @@
 package com.cloudstorage.controller;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +20,7 @@ import com.cloudstorage.model.dto.CreateFolderRequest;
 import com.cloudstorage.model.dto.FileResponse;
 import com.cloudstorage.model.entity.UserFile;
 import com.cloudstorage.service.FileService;
+import com.cloudstorage.util.FileUtils;
 
 import jakarta.validation.Valid;
 
@@ -32,9 +35,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 @RestController
 public class FileController {
     private final FileService fileService;
+    private final FileUtils fileUtils;
 
-    public FileController(FileService fileService) {
+    public FileController(FileService fileService, FileUtils fileUtils) {
         this.fileService = fileService;
+        this.fileUtils = fileUtils;
     }
 
     private Long getCurrentUserId() {
@@ -156,6 +161,21 @@ public class FileController {
         fileService.batchDelete(request.getIds(), getCurrentUserId());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/file/compress")
+    public ResponseEntity<FileSystemResource> compressFiles(@RequestParam("fileIds") Set<Long> fileIds,
+            @RequestParam(required = false, value = "archiveName") String archiveName) {
+
+        if (archiveName == null) {
+            archiveName = String.valueOf(System.currentTimeMillis());
+        }
+        FileSystemResource resource = fileUtils.compressFiles(fileIds, this.getCurrentUserId(), archiveName);
+
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + archiveName + ".zip\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
 }

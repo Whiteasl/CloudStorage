@@ -17,6 +17,7 @@ import com.cloudstorage.model.entity.User;
 import com.cloudstorage.model.entity.UserFile;
 import com.cloudstorage.repository.UserFileRepository;
 import com.cloudstorage.repository.UserRepository;
+import com.cloudstorage.util.FileUtils;
 
 import jakarta.transaction.Transactional;
 
@@ -25,12 +26,14 @@ public class FileService {
     private final StorageService storageService;
     private final UserFileRepository userFileRepository;
     private final UserRepository userRepository;
+    private final FileUtils fileUtil;
 
     public FileService(StorageService storageService, UserFileRepository userFileRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository, FileUtils fileUtil) {
         this.storageService = storageService;
         this.userFileRepository = userFileRepository;
         this.userRepository = userRepository;
+        this.fileUtil = fileUtil;
     }
 
     @Transactional
@@ -247,7 +250,7 @@ public class FileService {
 
             // 递归收集所有子文件
             List<UserFile> allFiles = new ArrayList<>();
-            collectSubdirectories(owner, uf.getId(), allFiles);
+            fileUtil.collectSubdirectories(owner, uf.getId(), allFiles);
 
             // 递归重命名子文件的路径
             for (UserFile child : allFiles) {
@@ -298,7 +301,7 @@ public class FileService {
         // 递归更新子文件
         if (source.isFolder()) {
             List<UserFile> allChild = new ArrayList<>();
-            collectSubdirectories(owner, sourceId, allChild);
+            fileUtil.collectSubdirectories(owner, sourceId, allChild);
 
             String oldPath = source.getFilePath();
 
@@ -368,21 +371,6 @@ public class FileService {
          */
         for (Long fileId : ids) {
             this.deleteFile(fileId, userId);
-        }
-
-    }
-
-    private void collectSubdirectories(User owner, Long folderId, List<UserFile> allFiles) {
-        // 帮助重命名方法获取目录下的所有子文件/目录
-        // 获取所有子文件
-        // 通过递归获取所有子目录
-
-        List<UserFile> children = userFileRepository.findByOwnerAndParentFolderId(owner, folderId);
-        for (UserFile child : children) {
-            allFiles.add(child);
-            if (child.isFolder()) {
-                collectSubdirectories(owner, child.getId(), allFiles);
-            }
         }
 
     }

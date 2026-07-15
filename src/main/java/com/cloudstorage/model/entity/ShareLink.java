@@ -20,37 +20,38 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table( name = "ShareLink" )
+@Table(name = "ShareLink")
 @EntityListeners(AuditingEntityListener.class)
 @AllArgsConstructor
 @NoArgsConstructor
-@Setter @Getter
-public class ShareLink{
+@Setter
+@Getter
+public class ShareLink {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String verificationCode;            // 校验码
+    private String verificationCode; // 校验码
 
     @ManyToOne
-    @JoinColumn( name = "file" )
-    private UserFile file;                      // 分享文件
+    @JoinColumn(name = "file")
+    private UserFile shareFile; // 分享文件
 
     @ManyToOne
-    @JoinColumn( name = "owner")
-    private User owner;         // 分享文件 拥有者
+    @JoinColumn(name = "owner")
+    private User owner; // 分享文件 拥有者
 
     @Column(nullable = false)
-    private int downloadCount = 0;                 // 下载次数
+    private int downloadCount = 0; // 下载次数
 
     @Column(nullable = false)
-    private int downloadLimit = -1;      // 允许下载次数，-1 代表在分享时间内无限制下载，分享文件必须设置分享次数
+    private int downloadLimit = -1; // 允许下载次数，-1 代表在分享时间内无限制下载，分享文件必须设置分享次数
 
     @CreatedDate
     @Column(nullable = false)
-    private LocalDateTime createdAt;        // 分享时间
+    private LocalDateTime createdAt; // 分享时间
 
     @Column(nullable = false)
-    private LocalDateTime expireTime;       // 过期时间
+    private LocalDateTime expireTime; // 过期时间
 }
