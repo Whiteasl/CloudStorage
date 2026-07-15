@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
 
+/**
+ * UserDetailsServiceImpl
+ */
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
@@ -19,6 +22,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * 根据用户名寻找用户实体
+     * 
+     * @param username 用户名
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 根据用户名查找用户实体

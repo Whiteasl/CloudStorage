@@ -1,6 +1,5 @@
 package com.cloudstorage.controller;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +31,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+/**
+ * FileController
+ */
 @RestController
 public class FileController {
     private final FileService fileService;
@@ -49,8 +51,14 @@ public class FileController {
         return Long.valueOf((String) auth.getPrincipal());
     }
 
+    /***
+     * 把 UserFile 实体转换成 FileResponse
+     * 
+     * @param uf 传入需要转换的 UserFile 实体
+     * @return 返回 FileResponse 对象
+     */
+
     private FileResponse toFileResponse(UserFile uf) {
-        // 把 UserFile 实体转换成 FileResponse
 
         return new FileResponse(
                 uf.getId(),
@@ -65,10 +73,10 @@ public class FileController {
     }
 
     /**
-     * 处理上传文件请求
+     * 上传文件控制器
      * 
-     * @param @RequestParam                 MultipartFile file 文件属性
-     * @param @RequestParam(required=false) Long parentFolderId 文件存储的目录ID
+     * @param MultipartFile  从URL中获取 file 文件属性
+     * @param parentFolderId 从URL中获取 文件存储的目录ID ，默认值为 null
      */
     @PostMapping("/file/upload")
     public ResponseEntity<Void> uploadFile(@RequestParam("file") MultipartFile file,
@@ -82,6 +90,12 @@ public class FileController {
 
     }
 
+    /**
+     * 下载文件控制器
+     * 
+     * @param fileId 从URL中获取 下载的文件ID
+     * 
+     */
     @GetMapping("/file/download")
     public ResponseEntity<FileSystemResource> downloadFile(@RequestParam("fileId") Long fileId) {
         Long userId = this.getCurrentUserId();
@@ -93,6 +107,12 @@ public class FileController {
                 .body(resource);
     }
 
+    /**
+     * 处理创建目录控制器
+     * 
+     * @param request 获取请求体
+     * 
+     */
     @PostMapping("/file/folder")
     public ResponseEntity<Void> createFolder(@RequestBody CreateFolderRequest request) {
 
@@ -100,6 +120,11 @@ public class FileController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    /**
+     * 列出指定目录下的所有文件/文件夹
+     * 
+     * @param parentFolderId 指定目录的ID，默认值为 null
+     */
     @GetMapping("/file/list")
     public ResponseEntity<List<FileResponse>> listFiles(
             @RequestParam(required = false, value = "parentFolderId") Long parentFolderId) {
@@ -111,12 +136,24 @@ public class FileController {
         return ResponseEntity.ok(fileResponseList);
     }
 
+    /**
+     * 删除文件控制器
+     * 
+     * @param fileId 被删除文件的ID
+     */
     @DeleteMapping("/file/delete")
     public ResponseEntity<Void> deleteFile(@RequestParam("fileId") Long fileId) {
         fileService.deleteFile(fileId, this.getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
+    /***
+     * 文件重命名控制器
+     * 
+     * @param fileId  文件 ID
+     * @param newName 新名字
+     * @return 返回一个状态码
+     */
     @PutMapping("/file/rename")
     public ResponseEntity<Void> renameFile(@RequestParam("fileId") Long fileId,
             @RequestParam("newName") String newName) {
@@ -126,6 +163,13 @@ public class FileController {
         return ResponseEntity.ok().build();
     }
 
+    /***
+     * 移动文件/文件夹控制器
+     * 
+     * @param sourceId       源文件ID
+     * @param targetFolderId 目标文件夹ID，默认为 null
+     * @return 成功移动 返回200，不成功则返回异常
+     */
     @PutMapping("/file/move")
     public ResponseEntity<Void> moveFile(@RequestParam("fileId") Long sourceId,
             @RequestParam(required = false, value = "targetFolderId") Long targetFolderId) {
@@ -135,6 +179,12 @@ public class FileController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * 获取文件元数据 控制器
+     *
+     * @param fileId 目标文件ID
+     * @return 返回 FileResponse 对象
+     */
     @GetMapping("/file/{fileId}")
     public ResponseEntity<FileResponse> getFileDetail(@PathVariable("fileId") Long fileId) {
 
@@ -143,6 +193,12 @@ public class FileController {
         return ResponseEntity.ok(fileResponse);
     }
 
+    /***
+     * 处理搜索文件控制器
+     * 
+     * @param keyword 搜索的键值
+     * @return 返回搜索结果
+     */
     @GetMapping("/file/search")
     public ResponseEntity<List<FileResponse>> searchFiles(@RequestParam("keyword") String keyword) {
 
@@ -156,6 +212,12 @@ public class FileController {
         return ResponseEntity.ok(fileResponses);
     }
 
+    /**
+     * 处理批量删除控制器
+     * 
+     * @param request 获取请求体
+     * @return 成功 返回状态码
+     */
     @PostMapping("/file/batch-delete")
     public ResponseEntity<Void> batchDelete(@Valid @RequestBody BatchDeleteRequest request) {
         fileService.batchDelete(request.getIds(), getCurrentUserId());
@@ -163,6 +225,13 @@ public class FileController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * 处理压缩文件控制器
+     * 
+     * @param fileIds     文件ID列表
+     * @param archiveName 压缩文件名
+     * @return 成功 返回一个下载链接
+     */
     @PostMapping("/file/compress")
     public ResponseEntity<FileSystemResource> compressFiles(@RequestParam("fileIds") Set<Long> fileIds,
             @RequestParam(required = false, value = "archiveName") String archiveName) {

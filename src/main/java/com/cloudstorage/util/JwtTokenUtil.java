@@ -22,6 +22,9 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 
+/**
+ * JwtTokenUtil
+ */
 @Component
 public class JwtTokenUtil {
     private final SecretKey key;
@@ -35,7 +38,12 @@ public class JwtTokenUtil {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    // 生成令牌
+    /**
+     * 生成令牌
+     * 
+     * @param user 用户实体
+     * @return 返回一个Token
+     */
     public String generateToken(User user) {
         return Jwts.builder()
                 .subject(user.getUsername()) // 设置主题 subject ，通常存放用户标示，如：用户名或用户id
@@ -48,7 +56,12 @@ public class JwtTokenUtil {
                 .compact(); // 压缩并生成最终的令牌字符串
     }
 
-    // 解析令牌
+    /**
+     * 解析令牌
+     * 
+     * @param token 令牌
+     * @return 返回一个 Claims
+     */
     public Claims validateToken(String token) {
         try {
             return Jwts.parser()
@@ -68,9 +81,14 @@ public class JwtTokenUtil {
         }
     }
 
-    // 从令牌中提取 id
-    public String getUserIdFromToken(String token) {
+    /**
+     * 从令牌中提取 id
+     * 
+     * @param token 令牌
+     * @return 返回ID
+     */
+    public Long getUserIdFromToken(String token) {
         Claims claims = validateToken(token);
-        return claims.get("id", String.class);
+        return claims.get("id", Long.class);
     }
 }

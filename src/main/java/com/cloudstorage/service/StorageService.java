@@ -9,16 +9,30 @@ import java.nio.file.attribute.PosixFilePermissions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+/**
+ * StorageService
+ */
 @Service
 public class StorageService {
     @Value("${cloudstorage.storage.root}")
     private String storagePath;
 
+    /**
+     * 获取用户路径
+     * 
+     * @param userId 用户ID
+     * @return 返回用户路径
+     */
     public Path getUserPath(Long userId) {
-        // 获取用户路径
+
         return Paths.get(storagePath, userId.toString());
     }
 
+    /**
+     * 初始化用户路径，生成用户目录。只在用户注册时使用一次
+     * 
+     * @param userId 用户ID
+     */
     public void initUserDirectory(Long userId) {
         // 先调用 getUserPath 获取用户路径
         Path userPath = getUserPath(userId);
@@ -32,6 +46,13 @@ public class StorageService {
         }
     }
 
+    /**
+     * 验证路径，清除目录穿越漏洞
+     * 
+     * @param userId       用户ID
+     * @param relativePath 真实路径
+     * @return 返回全路径（从用户目录开始）
+     */
     public Path validatePath(Long userId, String relativePath) {
         // 用于验证路径，确保没有目录穿越漏洞
         Path userDir = getUserPath(userId);
@@ -46,6 +67,11 @@ public class StorageService {
 
     }
 
+    /**
+     * 对文件去除执行权限
+     * 
+     * @param path 文件路径
+     */
     public void removeExecutePermission(Path path) {
         // 对传入的文件去除执行权限，如果传入的路径是目录，则不做处理/重写权限
         try {

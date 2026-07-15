@@ -21,6 +21,9 @@ import com.cloudstorage.util.FileUtils;
 
 import jakarta.transaction.Transactional;
 
+/**
+ * FileService
+ */
 @Service
 public class FileService {
     private final StorageService storageService;
@@ -36,10 +39,16 @@ public class FileService {
         this.fileUtil = fileUtil;
     }
 
+    /**
+     * 上传文件 业务代码
+     * 
+     * @param file           上传的文件数据
+     * @param userId         用户ID
+     * @param parentFolderId 存储上传文件的文件夹ID
+     * 
+     */
     @Transactional
     public void uploadFile(MultipartFile file, Long userId, Long parentFolderId) {
-
-        // 管理文件上传功能
 
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户，请联系管理员解决"));
@@ -67,6 +76,8 @@ public class FileService {
                 parentFolderId))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "目录下已存在同名");
 
+        // 更新数据库数据
+        // 把文件写入到磁盘中
         try {
             UserFile uf = new UserFile();
 
@@ -92,8 +103,15 @@ public class FileService {
 
     }
 
+    /**
+     * 下载文件 业务
+     * 
+     * @param fileId 被下载的文件的ID
+     * @param userId 文件所有者ID
+     * @return 成功 则返回一个文件内容流
+     */
+
     public FileSystemResource downloadFile(Long fileId, Long userId) {
-        // 用于管理下载文件的功能
 
         // 获取文件实体
         UserFile uf = userFileRepository
@@ -112,9 +130,15 @@ public class FileService {
         return new FileSystemResource(diskPath);
     }
 
+    /**
+     * 创建目录功能
+     * 
+     * @param folderName     目录名
+     * @param userId         所有者ID
+     * @param parentFolderId 目录所在目录的ID
+     */
     @Transactional
     public void createFolder(String folderName, Long userId, Long parentFolderId) {
-        // 创建目录功能
 
         // 创建用户实体
         User owner = userRepository.findById(userId)
@@ -155,15 +179,27 @@ public class FileService {
 
     }
 
+    /**
+     * 获取目录下的所有文件和文件夹
+     * 
+     * @param userId         目录所有者ID
+     * @param parentFolderId 目录ID
+     * @return 成功 则返回一个包含 UserFile 实体的列表
+     */
     public List<UserFile> listFiles(Long userId, Long parentFolderId) {
-        // 获取目录下所有文件和目录
+
         return userFileRepository.findByOwnerAndParentFolderId(userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户")), parentFolderId);
     }
 
+    /**
+     * 删除文件
+     * 
+     * @param fileId 文件ID
+     * @param userId 文件所有者ID
+     */
     @Transactional
     public void deleteFile(Long fileId, Long userId) {
-        // 删除文件功能
 
         // 检验文件归属
         User owner = userRepository.findById(userId)
@@ -190,6 +226,13 @@ public class FileService {
         userFileRepository.deleteByIdAndOwner(fileId, owner);
     }
 
+    /**
+     * 重命名
+     * 
+     * @param fileId  文件ID
+     * @param userId  文件所有者ID
+     * @param newName 新名字
+     */
     @Transactional
     public void renameFile(Long fileId, Long userId, String newName) {
         /**
@@ -264,16 +307,15 @@ public class FileService {
         }
     }
 
+    /**
+     * 移动文件
+     * 
+     * @param sourceId       源文件ID
+     * @param userId         文件所有者ID
+     * @param targetFolderId 目标目录的ID
+     */
     @Transactional
     public void moveFile(Long sourceId, Long userId, Long targetFolderId) {
-        /**
-         * 把被移动目录移动到指定目录中
-         * 需注意，不能把文件移动到自己的子目录中
-         * 
-         * @param sourceId       被移动目录id
-         * @param userId         目录所有者id
-         * @param targetFolderId 目标目录
-         */
 
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
@@ -327,6 +369,13 @@ public class FileService {
 
     }
 
+    /**
+     * 获取文件元数据
+     * 
+     * @param userId // 用户 ID
+     * @param fileId // 文件 ID
+     */
+
     public UserFile getFileDetail(Long fileId, Long userId) {
         /**
          * 获取文件元数据
@@ -336,10 +385,8 @@ public class FileService {
          * 类型：text/plain
          * 创建时间：2026-09-29 13:00
          * 修改时间：2026-09-30 12:00
-         * 
-         * @param userId // 用户 ID
-         * @param fileId // 文件 ID
          */
+
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
         UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
@@ -349,43 +396,48 @@ public class FileService {
 
     }
 
+    /**
+     * 搜索文件
+     * 
+     * @param userId  所有者ID
+     * @param keyword 搜索的字符
+     */
     public List<UserFile> searchFiles(Long userId, String keyword) {
-        /**
-         * 搜索文件
-         * 
-         * @param userId  所有者ID
-         * @param keyword 搜索的字符
-         */
+
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
         return userFileRepository.findByOwnerAndFilenameContaining(owner, keyword);
     }
 
+    /**
+     * 批量删除
+     * 
+     * @param ids     需要被删除的文件ID
+     * @param userId: 拥有者ID
+     */
     @Transactional
     public void batchDelete(Set<Long> ids, Long userId) {
-        /**
-         * 批量删除
-         * 
-         * @param ids     需要被删除的文件ID
-         * @param userId: 拥有者ID
-         */
+
         for (Long fileId : ids) {
             this.deleteFile(fileId, userId);
         }
 
     }
 
+    /**
+     * 检查目标目录是否为被移动目录的子目录
+     * 
+     * @param owner          当前用户
+     * @param folderId       被移动目录的id
+     * @param targetFolderId 目标目录的id
+     *                       return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
+     **/
     private boolean isDescendantOf(User owner, Long folderId, Long targetFolderId) {
         /**
          * 检查目标目录是否为被移动目录的子目录
          * 从 targetFolder 往上追溯 parentFolder 链
          * 如果遇到了 folder 就说明目标目录是被移动目录的子目录
-         * 
-         * @param owner          当前用户
-         * @param folderId       被移动目录的id
-         * @param targetFolderId 目标目录的id
-         *                       return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
-         **/
+         */
 
         Long currentFolder = targetFolderId;
         while (currentFolder != null) {

@@ -14,6 +14,9 @@ import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.util.JwtTokenUtil;
 
+/**
+ * AuthService
+ */
 @Service
 public class AuthService {
     private final AuthenticationManager authenticatorManager;
@@ -27,6 +30,13 @@ public class AuthService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * 登录验证
+     * 
+     * @param request 获取请求体
+     * @return 登录成功则把令牌写入 Auth 中
+     * 
+     */
     public AuthResponse login(LoginRequest request) {
         UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                 request.getUsername(),

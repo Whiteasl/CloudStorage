@@ -16,6 +16,9 @@ import com.cloudstorage.util.JwtTokenUtil;
 
 import jakarta.validation.Valid;
 
+/**
+ * AuthController
+ */
 @RestController
 public class AuthController {
     private final UserService userService;
@@ -28,6 +31,12 @@ public class AuthController {
         this.jwtTokenUtil = jwtTokenUtil;
     }
 
+    /**
+     * 用户注册控制器
+     * 
+     * @param request 注册请求体
+     * @return
+     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         User user = userService.registerUser(request);
@@ -36,6 +45,12 @@ public class AuthController {
                 .body(new AuthResponse(user.getUsername(), token, user.getRole()));
     }
 
+    /**
+     * 用户登录控制器
+     * 
+     * @param request 登录请求体
+     * @return
+     */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
 

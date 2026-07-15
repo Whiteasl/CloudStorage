@@ -1,5 +1,3 @@
-// 用于定义安全策略
-
 package com.cloudstorage.config;
 
 import org.springframework.context.annotation.Bean;
@@ -18,6 +16,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.cloudstorage.security.JwtAuthenticationFilter;
 import com.cloudstorage.util.JwtTokenUtil;
 
+/**
+ * SecurityConfig
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity // 方法级别的安全控制 先加上，后续可能有用 对同一个 URL 的不同HTTP方法选用不同的权限 开启 PreAuthorize 注解功能
@@ -28,12 +29,20 @@ public class SecurityConfig {
         this.jwtTokenUtil = jwtTokenUtil;
     }
 
+    /**
+     * 安全检查 Filter
+     * 
+     * @param http
+     * @return
+     * @throws Exception
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register", "/Share/**").permitAll() // 对登录/注册/访问分享链接行为
-                                                                                                                    // 无须进行登录，可以直接访问
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register", "/Share/*").permitAll() // 对登录/注册/访问分享链接行为
+                                                                                                                   // 无须进行登录，可以直接访问
+                        .requestMatchers("/share/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN") // 管理员页面需要验证用户为管理员才能访问
                         .requestMatchers("/file/**").hasAnyRole("USER", "ADMIN") // 文件存储页面需要验证用户登录状态，只有登录的用户才能访问
                         .requestMatchers("/css/**", "/js/**").permitAll() // 前端资源允许所有人访问，防止出现页面无法加载或格式错误异常出现
@@ -43,16 +52,27 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * 密码加密器
+     * 
+     * @return
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         // 对密码进行加密
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * 认证执行器
+     * 
+     * @param config
+     * @return
+     * @throws Exception
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         // 认证执行器 - 拿用户名和密码去检验
-        // 需要先编写 UserDetailsService 文件 所以先跳过，后续再回来写
 
         // 认证管理器 - 供登录接口使用
         // SpringBoot 会自动整合 UserDetailsService 和 PasswordEncoder 到 Ioc 容器中

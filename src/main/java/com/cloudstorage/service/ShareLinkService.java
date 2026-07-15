@@ -21,6 +21,9 @@ import com.cloudstorage.repository.UserFileRepository;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.util.RandomChar;
 
+/**
+ * ShareLinkService
+ */
 @Service
 public class ShareLinkService {
     private final ShareLinkRepository shareLinkRepository;
@@ -36,6 +39,14 @@ public class ShareLinkService {
         this.shareLinkRepository = shareLinkRepository;
     }
 
+    /**
+     * 创建分享链接
+     * 
+     * @param fileId        分享的文件ID
+     * @param userId        文件所有者ID
+     * @param downloadLimit 下载次数限制，-1 为无限次
+     * @param expireHours   过期时间
+     */
     public ShareLinkResponse createShare(Long fileId, Long userId, int downloadLimit, int expireHours) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到账户"));
@@ -43,6 +54,10 @@ public class ShareLinkService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文件异常：未找到文件"));
 
         ShareLink sl = new ShareLink();
+
+        // 验证下载次数是否正确
+        if (downloadLimit < -1)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "下载次数限制异常：次数小于-1");
 
         if (shareLinkRepository.existsByShareFileAndOwner(uf, owner)) {
 
@@ -71,6 +86,12 @@ public class ShareLinkService {
         return toShareLinkResponse(sl);
     }
 
+    /**
+     * 验证分享链接
+     * 
+     * @param code 分享链接中包含的校验码
+     * @return 检验成功则返回文件流
+     */
     @Transactional
     public FileSystemResource accessShare(String code) {
 
@@ -95,6 +116,12 @@ public class ShareLinkService {
         return new FileSystemResource(diskPath);
     }
 
+    /**
+     * 列出所有分享链接
+     * 
+     * @param userId 用户ID
+     * @return 返回一个存储 ShareLinkResponse 类型的列表
+     */
     public List<ShareLinkResponse> listMyShare(Long userId) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户异常：未找到用户"));
@@ -108,6 +135,12 @@ public class ShareLinkService {
         return shareLinkResponses;
     }
 
+    /**
+     * 删除分享链接
+     * 
+     * @param id     链接ID
+     * @param userId 所有者ID
+     */
     public void deleteShare(Long id, Long userId) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到用户"));
@@ -128,6 +161,8 @@ public class ShareLinkService {
 
     /**
      * 把 ShareLink 实体转换成 ShareLinkResponse
+     * 
+     * @param sl 分享链接实体
      */
     private ShareLinkResponse toShareLinkResponse(ShareLink sl) {
         return new ShareLinkResponse(

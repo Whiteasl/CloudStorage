@@ -20,6 +20,9 @@ import com.cloudstorage.repository.UserFileRepository;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.service.StorageService;
 
+/**
+ * FileUtils
+ */
 @Component
 public class FileUtils {
 
@@ -34,6 +37,14 @@ public class FileUtils {
         this.storageService = storageService;
     }
 
+    /**
+     * 压缩文件
+     * 
+     * @param fileIds     文件ID集合
+     * @param userId      所有者ID
+     * @param archiveName 压缩文件名字
+     * @return 成功则返回一个 FileSystemResource 对象
+     */
     public FileSystemResource compressFiles(Set<Long> fileIds, Long userId, String archiveName) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到账户"));
@@ -49,6 +60,7 @@ public class FileUtils {
         try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(tempZip))) {
 
             for (UserFile uf : userFiles) {
+                // 压缩目录
                 if (uf.isFolder()) {
                     ZipEntry dirEntry = new ZipEntry(uf.getFilePath() + "/");
                     zos.putNextEntry(dirEntry);
@@ -56,6 +68,7 @@ public class FileUtils {
 
                     List<UserFile> children = new ArrayList<>();
 
+                    // 获取所有子目录
                     collectSubdirectories(owner, uf.getId(), children);
 
                     for (UserFile child : children) {
@@ -70,6 +83,8 @@ public class FileUtils {
                     }
 
                 } else {
+                    // 压缩文件
+
                     Path diskPath = storageService.validatePath(userId, uf.getFilePath());
                     ZipEntry entry = new ZipEntry(uf.getFilePath());
                     zos.putNextEntry(entry);
@@ -85,6 +100,13 @@ public class FileUtils {
         return new FileSystemResource(tempZip);
     }
 
+    /**
+     * 从文件ID获取文件实体
+     * 
+     * @param fileIds 文件ID集合
+     * @param owner   文件拥有者
+     * @return 成功则返回一个存储 UserFile 实体的列表
+     */
     private List<UserFile> getFilesByIds(Set<Long> fileIds, User owner) {
 
         List<UserFile> userFiles = new ArrayList<>();
@@ -98,10 +120,14 @@ public class FileUtils {
         return userFiles;
     }
 
+    /**
+     * 通过递归获取目录下的所有子文件/目录
+     * 
+     * @param owner    目录拥有者
+     * @param folderId 目录ID
+     * @param allFiles 传入的列表
+     */
     public void collectSubdirectories(User owner, Long folderId, List<UserFile> allFiles) {
-        // 帮助重命名方法获取目录下的所有子文件/目录
-        // 获取所有子文件
-        // 通过递归获取所有子目录
 
         List<UserFile> children = userFileRepository.findByOwnerAndParentFolderId(owner, folderId);
         for (UserFile child : children) {

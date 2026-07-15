@@ -19,6 +19,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+/**
+ * JwtAuthenticationFilter
+ */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private JwtTokenUtil jwtTokenUtil;
@@ -27,6 +30,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.jwtTokenUtil = jwtTokenUtil;
     }
 
+    /**
+     * 令牌检验Filter
+     * 
+     * @param request     请求体
+     * @param response    响应体
+     * @param filterChain Filter字段
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
