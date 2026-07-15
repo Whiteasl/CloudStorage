@@ -193,9 +193,9 @@ public class FileService {
          * 重命名
          * 把 指定文件/目录 重命名
          * 
-         * @Param fileId 指定文件/目录 ID
-         * @Param userId 用户 ID
-         * @Param newName 新名字
+         * @param fileId  指定文件/目录 ID
+         * @param userId  用户 ID
+         * @param newName 新名字
          */
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
@@ -267,9 +267,9 @@ public class FileService {
          * 把被移动目录移动到指定目录中
          * 需注意，不能把文件移动到自己的子目录中
          * 
-         * @Param sourceId 被移动目录id
-         * @Param userId 目录所有者id
-         * @Param targetFolderId 目标目录
+         * @param sourceId       被移动目录id
+         * @param userId         目录所有者id
+         * @param targetFolderId 目标目录
          */
 
         User owner = userRepository.findById(userId)
@@ -334,8 +334,8 @@ public class FileService {
          * 创建时间：2026-09-29 13:00
          * 修改时间：2026-09-30 12:00
          * 
-         * @Param userId // 用户 ID
-         * @Param fileId // 文件 ID
+         * @param userId // 用户 ID
+         * @param fileId // 文件 ID
          */
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
@@ -347,6 +347,12 @@ public class FileService {
     }
 
     public List<UserFile> searchFiles(Long userId, String keyword) {
+        /**
+         * 搜索文件
+         * 
+         * @param userId  所有者ID
+         * @param keyword 搜索的字符
+         */
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
         return userFileRepository.findByOwnerAndFilenameContaining(owner, keyword);
@@ -354,6 +360,12 @@ public class FileService {
 
     @Transactional
     public void batchDelete(Set<Long> ids, Long userId) {
+        /**
+         * 批量删除
+         * 
+         * @param ids     需要被删除的文件ID
+         * @param userId: 拥有者ID
+         */
         for (Long fileId : ids) {
             this.deleteFile(fileId, userId);
         }
@@ -381,10 +393,10 @@ public class FileService {
          * 从 targetFolder 往上追溯 parentFolder 链
          * 如果遇到了 folder 就说明目标目录是被移动目录的子目录
          * 
-         * @Param owner 当前用户
-         * @Param folderId 被移动目录的id
-         * @Param targetFolderId 目标目录的id
-         *        return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
+         * @param owner          当前用户
+         * @param folderId       被移动目录的id
+         * @param targetFolderId 目标目录的id
+         *                       return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
          **/
 
         Long currentFolder = targetFolderId;
