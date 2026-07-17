@@ -42,7 +42,7 @@ export function post<T>(url: string, body: unknown): Promise<T> {
   });
 }
 
-export function put<T>(url: string, body: unknown): Promise<T> {
+export function put<T>(url: string, body?: unknown): Promise<T> {
   return request<T>(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

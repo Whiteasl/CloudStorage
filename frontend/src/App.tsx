@@ -15,10 +15,10 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/share/:code" element={<ShareAccessPage />} />
 
-      <Route element={token ? <Layout /> : <Navigate to="/login" />}>
-        <Route path="/files" element={<FilesPage />} />
-        <Route path="/share" element={<SharePage />} />
-      </Route>
+      {/* <Route element={token ? <Layout /> : <Navigate to="/login" />}> */}
+      <Route path="/files" element={<FilesPage />} />
+      <Route path="/share" element={<SharePage />} />
+      {/* </Route> */}
     </Routes>
   );
 }

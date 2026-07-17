@@ -27,7 +27,7 @@ export interface FileResponse {
   isFolder: boolean;
   parentFolderId: number | null;
   createdAt: string;
-  updateAt: string;
+  updatedAt: string;
 }
 
 // 请求体 DTO
