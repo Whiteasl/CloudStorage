@@ -168,8 +168,10 @@ public class ShareLinkService {
         return new ShareLinkResponse(
                 sl.getId(),
                 sl.getVerificationCode(),
-                sl.getShareFile(),
-                sl.getOwner(),
+                sl.getShareFile().getFilename(),
+                sl.getShareFile().getFileSize(),
+                sl.getShareFile().isFolder(),
+                sl.getOwner().getUsername(),
                 sl.getDownloadCount(),
                 sl.getDownloadLimit(),
                 sl.getCreatedAt(),
