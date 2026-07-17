@@ -40,7 +40,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register", "/Share/*").permitAll() // 对登录/注册/访问分享链接行为
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register", "/Share/**").permitAll() // 对登录/注册/访问分享链接行为
                                                                                                                    // 无须进行登录，可以直接访问
                         .requestMatchers("/share/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN") // 管理员页面需要验证用户为管理员才能访问
