@@ -42,14 +42,18 @@ export default function FilesPage() {
     // 设置加载状态
     setLoading(true);
 
-    const param = folderId !== null ? `?parentFolderId=${folderId}` : "";
-    const data = await get<FileResponse[]>(`/file/list${param}`);
+    try {
+      const param = folderId !== null ? `?parentFolderId=${folderId}` : "";
+      const data = await get<FileResponse[]>(`/file/list${param}`);
 
-    // 设置当前目录的文件列表
-    setFiles(data);
-
-    // 重置加载中状态
-    setLoading(false);
+      // 设置当前目录的文件列表
+      setFiles(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      // 重置加载中状态
+      setLoading(false);
+    }
   }
 
   async function handleSearch(): Promise<void> {
