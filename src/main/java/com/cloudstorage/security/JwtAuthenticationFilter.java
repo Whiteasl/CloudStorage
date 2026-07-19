@@ -51,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // 找到了令牌，对令牌进行检查
             Claims claims = jwtTokenUtil.validateToken(author.substring(7)); // 解析令牌，把字符串转化成令牌对象
-            String userId = claims.get("id", String.class);
+            Long userId = claims.get("id", Long.class);
             List<GrantedAuthority> authorities = List
                     .of(new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class).toUpperCase()));
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userId, null,
