@@ -109,6 +109,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>org.mariadb.jdbc</groupId>
+			<artifactId>mariadb-java-client</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
 		<!-- JWT 身份令牌 -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

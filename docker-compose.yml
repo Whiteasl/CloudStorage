@@ -1,0 +1,39 @@
+services:
+  db:
+    image: mariadb:11
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: cloudstorage
+      MARIADB_USER: clouduser
+      MARIADB_PASSWORD: cloudpass
+
+    volumes:
+      - ${DATA_DIR:-/opt/cloudstorage/data}/mariadb_data:/var/lib/mysql
+
+    ports:
+      - "3306:3306"
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:mariadb://db:3306/cloudstorage
+      DB_DRIVER: org.mariadb.jdbc.Driver
+      DB_USERNAME: clouduser
+      DB_PASSWORD: cloudpass
+      DATA_DIR: /app/data
+      STORAGE_ROOT: /app/data/storage
+
+    volumes:
+      - ${DATA_DIR:-/opt/cloudstorage/data}/storage:/app/data/storage
+
+    depends_on:
+      db:
+        condition: service_healthy
