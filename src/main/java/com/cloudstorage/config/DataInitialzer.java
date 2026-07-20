@@ -1,5 +1,6 @@
 package com.cloudstorage.config;
 
+import com.cloudstorage.service.StorageService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -13,12 +14,15 @@ import com.cloudstorage.repository.UserRepository;
 @Component
 public class DataInitialzer implements CommandLineRunner {
 
+    private final StorageService storageService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public DataInitialzer(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public DataInitialzer(UserRepository userRepository, PasswordEncoder passwordEncoder,
+            StorageService storageService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.storageService = storageService;
     }
 
     @Override
@@ -51,6 +55,8 @@ public class DataInitialzer implements CommandLineRunner {
         user.setEnabled(true);
 
         userRepository.save(user);
+
+        storageService.initUserDirectory(user.getId());
 
         System.out.println("[DataInitialzer] 创建初始用户：" + username + "( " + role + ")");
         System.out.println("[DataInitialzer] 密码：" + password);

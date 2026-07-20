@@ -48,7 +48,7 @@ public class FileController {
         // 获取当前用户
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return Long.valueOf((String) auth.getPrincipal());
+        return (Long) auth.getPrincipal();
     }
 
     /***

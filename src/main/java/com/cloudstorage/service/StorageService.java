@@ -55,12 +55,12 @@ public class StorageService {
      */
     public Path validatePath(Long userId, String relativePath) {
         // 用于验证路径，确保没有目录穿越漏洞
-        Path userDir = getUserPath(userId);
+        Path userDir = getUserPath(userId).normalize();
         Path target = userDir.resolve(relativePath).normalize();
 
         // 验证传入的路径是否在用户根目录下
         if (!target.startsWith(userDir))
-            throw new RuntimeException("路径不存在，请检查文件是否正确，或联系管理员报告Bug");
+            throw new RuntimeException("路径不存在");
 
         // 返回一个文件路径，从用户根目录开始
         return target;

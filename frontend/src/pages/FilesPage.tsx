@@ -1,19 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FileResponse } from "../types";
 import { del, get, post, put, upload } from "../api/client";
-
-function formatSize(size: number): string {
-  const sizes: string[] = ["B", "KB", "MB", "GB"];
-
-  let index: number = 0;
-
-  while (size >= 1024) {
-    size = size / 1024;
-    index++;
-  }
-
-  return size.toFixed(1) + sizes[index];
-}
+import { formatSize } from "../utils/format";
 
 export default function FilesPage() {
   const [files, setFiles] = useState<FileResponse[]>([]); // 当前目录的文件列表
@@ -112,7 +100,7 @@ export default function FilesPage() {
 
   return (
     <div className="files-pages">
-      <div className="nav">
+      <div className="breadcrumbs">
         {/* 面包屑 */}
         <button
           onClick={() => {
@@ -133,7 +121,7 @@ export default function FilesPage() {
       </div>
 
       {/* 上传文件 */}
-      <div className="utils">
+      <div className="toolbar">
         <input
           type="file"
           ref={fileInputRef}
@@ -201,9 +189,7 @@ export default function FilesPage() {
         ) : null}
       </div>
 
-      {!loading && files.length === 0 && <p>目录为空</p>}
-
-      {loading && <p>加载中</p>}
+      {loading && <p className="loading-state">加载中...</p>}
 
       <table>
         <thead>
@@ -273,13 +259,18 @@ export default function FilesPage() {
           ))}
         </tbody>
       </table>
+
+      {!loading && files.length === 0 && (
+        <p className="empty-state">目录为空</p>
+      )}
+
       {selected.size > 0 && (
-        <>
+        <div className="selection-bar">
           <span>已选择 {selected.size} 个文件</span>
           <button onClick={() => batchDelFile()}>批量删除</button>
 
           <button onClick={compress}>压缩下载</button>
-        </>
+        </div>
       )}
     </div>
   );

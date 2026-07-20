@@ -3,6 +3,7 @@ package com.cloudstorage.controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cloudstorage.service.ShareLinkService;
+import com.cloudstorage.model.dto.CreateShareRequest;
 import com.cloudstorage.model.dto.ShareLinkResponse;
 
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,11 +41,11 @@ public class ShareLinkController {
      * @return
      */
     @PostMapping("/share/create")
-    public ResponseEntity<Void> createShare(@RequestParam("fileId") Long fileId,
-            @RequestParam("downloadLimit") int downloadLimit, @RequestParam("expireHours") int expireHours) {
+    public ResponseEntity<ShareLinkResponse> createShare(@RequestBody CreateShareRequest request) {
 
-        shareLinkService.createShare(fileId, this.getCurrentUserId(), downloadLimit, expireHours);
-        return ResponseEntity.ok().build();
+        return ResponseEntity
+                .ok(shareLinkService.createShare(request.getFileId(), this.getCurrentUserId(),
+                        request.getDownloadLimit(), request.getExpiredHours()));
     }
 
     /**
@@ -89,6 +91,11 @@ public class ShareLinkController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/Share/{code}/info")
+    public ResponseEntity<ShareLinkResponse> getShareInfo(@PathVariable("code") String code) {
+        return ResponseEntity.ok(shareLinkService.getShareInfo(code));
+    }
+
     /**
      * 获取当前用户ID
      * 
@@ -98,7 +105,7 @@ public class ShareLinkController {
         // 获取当前用户
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return Long.valueOf((String) auth.getPrincipal());
+        return (Long) auth.getPrincipal();
     }
 
 }

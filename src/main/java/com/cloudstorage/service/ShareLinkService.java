@@ -47,7 +47,7 @@ public class ShareLinkService {
      * @param downloadLimit 下载次数限制，-1 为无限次
      * @param expireHours   过期时间
      */
-    public ShareLinkResponse createShare(Long fileId, Long userId, int downloadLimit, int expireHours) {
+    public ShareLinkResponse createShare(Long fileId, Long userId, int downloadLimit, int expiredHours) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到账户"));
         UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
@@ -80,7 +80,7 @@ public class ShareLinkService {
         sl.setShareFile(uf);
         sl.setOwner(owner);
         sl.setDownloadLimit(downloadLimit);
-        sl.setExpireTime(LocalDateTime.now().plusHours(expireHours));
+        sl.setExpireTime(LocalDateTime.now().plusHours(expiredHours));
         shareLinkRepository.save(sl);
 
         return toShareLinkResponse(sl);
@@ -145,6 +145,13 @@ public class ShareLinkService {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到用户"));
         shareLinkRepository.deleteByIdAndOwner(id, owner);
+    }
+
+    public ShareLinkResponse getShareInfo(String code) {
+        ShareLink sl = shareLinkRepository.findByVerificationCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到分享文件"));
+
+        return toShareLinkResponse(sl);
     }
 
     /**

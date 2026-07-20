@@ -26,5 +26,5 @@ public class ShareLinkResponse {
     private int downloadCount;
     private int downloadLimit;
     private LocalDateTime createdAt;
-    private LocalDateTime expireTime;
+    private LocalDateTime expiredTime;
 }

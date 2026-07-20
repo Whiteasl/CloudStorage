@@ -1,22 +1,24 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 
 export default function Layout() {
+  const navigate = useNavigate();
   return (
-    <div>
-      <nav>导航栏</nav>
-      <main>
-        <Link to="/files"> 我的文件 </Link>
-        <Link to="/share"> 我的分享 </Link>
-        <a
-          href="#"
+    <div className="app-layout">
+      <nav className="app-nav">
+        <span className="nav-brand">云存储</span>
+        <Link to="/files">我的文件</Link>
+        <Link to="/share">我的分享</Link>
+        <button
           onClick={(e) => {
             e.preventDefault();
             localStorage.removeItem("token");
-            window.location.href = "/login";
+            navigate("/login");
           }}
         >
           退出
-        </a>
+        </button>
+      </nav>
+      <main>
         <Outlet />
       </main>
     </div>

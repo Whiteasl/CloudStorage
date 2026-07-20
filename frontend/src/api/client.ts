@@ -1,5 +1,5 @@
 // 前后端通信层
-const BASE_URL: string = "/api";
+const BASE_URL: string = import.meta.env.PROD ? "" : "/api";
 
 function getToken(): string | null {
   let token: string | null;
@@ -26,7 +26,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-  return response.json() as T;
+  const text = await response.text();
+  return text ? JSON.parse(text) : (undefined as T);
 }
 
 // 五个请求方法

@@ -2,6 +2,8 @@ package com.cloudstorage.model.dto;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,6 +32,7 @@ public class FileResponse {
     private String filePath;
     private long fileSize;
     private String contentType;
+    @JsonProperty("isFolder")
     private boolean isFolder;
     private Long parentFolderId;
     private LocalDateTime createdAt;

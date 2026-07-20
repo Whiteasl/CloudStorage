@@ -44,8 +44,10 @@ export interface BatchDeleteRequest {
 export interface ShareLinkResponse {
   id: number;
   verificationCode: string;
-  shareFile: { filename: string; fileSize: number; isFolder: boolean };
-  owner: { username: string };
+  filename: string;
+  fileSize: number;
+  isFolder: boolean;
+  ownerName: string;
   downloadCount: number;
   downloadLimit: number;
   createdAt: string;
