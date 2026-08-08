@@ -34,6 +34,9 @@ public class PasswordResetService {
     private final MailClient mailClient;
     private final JwtTokenUtil jwtTokenUtil;
 
+    @Value("${cloudstorage.app.base-url}")
+    private String baseURL;
+
     @Value("${cloudstorage.mail.reset-password-subject}")
     private String resetPasswordSubject;
 
@@ -61,6 +64,24 @@ public class PasswordResetService {
         String token = jwtTokenUtil.generateForgotPasswordToken(email);
 
         return new ForgotPasswordResponse(true, token);
+    }
+
+    /**
+     * 忘记密码 - 邮件验证
+     * 
+     * @param email 邮箱
+     */
+    public void forgotPasswordEmail(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
+
+        String token = this.generateTokenAndSaved(user);
+
+        String link = this.baseURL + "/forgot-password/validate?token=" + token;
+
+        mailClient.resetPasswordSend(email, resetPasswordSubject, link, token);
+
     }
 
     /**
@@ -124,25 +145,11 @@ public class PasswordResetService {
         double probability = count / securityQuestions.size();
 
         if (probability > 0.75) {
-            String token = jwtTokenUtil.generateToken(user);
-            redis.opsForValue().set("reset:token:" + token, String.valueOf(user.getId()), Duration.ofMinutes(20));
+            String token = this.generateTokenAndSaved(user);
             return new VerifySecurityAnswerResponse(true, token);
         }
 
         return new VerifySecurityAnswerResponse(false, "");
-    }
-
-    /**
-     * 校验 忘记密码 的Token是否正确
-     * 
-     * @param token 校验 忘记密码 的Token
-     * @return String - 正确返回userId，错误返回null
-     */
-    private String validateToken(String token) {
-        if (token == null || token.isEmpty())
-            return null;
-
-        return redis.opsForValue().get("reset:token:" + token);
     }
 
     /**
@@ -153,7 +160,8 @@ public class PasswordResetService {
      */
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        String userId = validateToken(token);
+        String userId = this.validateResetPasswordToken(token);
+
         if (userId == null || userId.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "账户异常");
         }
@@ -170,5 +178,34 @@ public class PasswordResetService {
         mailClient.send(user.getEmail(), resetPasswordSubject, text);
         // 密码重置成功，删除 Token
         redis.delete("reset:token:" + token);
+    }
+
+    /**
+     * 校验 忘记密码 的Token是否正确
+     * 
+     * @param token 校验 忘记密码 的Token
+     * @return String - 正确返回userId，错误返回null
+     */
+    public String validateResetPasswordToken(String token) {
+
+        if (token == null || token.isEmpty())
+            return null;
+
+        String userId = redis.opsForValue().get("reset:token:" + token);
+
+        if (userId == null)
+            return null;
+
+        userRepository.findById(Long.valueOf(userId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号出错，请重试或联系管理员"));
+
+        return userId;
+    }
+
+    private String generateTokenAndSaved(User user) {
+        String token = jwtTokenUtil.generateToken(user);
+        redis.opsForValue().set("reset:token:" + token, String.valueOf(user.getId()), Duration.ofMinutes(20));
+
+        return token;
     }
 }
