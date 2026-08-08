@@ -14,9 +14,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.cloudstorage.model.dto.BatchDeleteRequest;
-import com.cloudstorage.model.dto.CreateFolderRequest;
-import com.cloudstorage.model.dto.FileResponse;
+import com.cloudstorage.model.dto.Request.BatchDeleteRequest;
+import com.cloudstorage.model.dto.Request.CreateFolderRequest;
+import com.cloudstorage.model.dto.Response.FileResponse;
 import com.cloudstorage.model.entity.UserFile;
 import com.cloudstorage.service.FileService;
 import com.cloudstorage.util.FileUtils;

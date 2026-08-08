@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cloudstorage.model.dto.AuthResponse;
-import com.cloudstorage.model.dto.LoginRequest;
-import com.cloudstorage.model.dto.RegisterRequest;
+import com.cloudstorage.model.dto.Request.LoginRequest;
+import com.cloudstorage.model.dto.Request.RegisterRequest;
+import com.cloudstorage.model.dto.Response.AuthResponse;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.service.AuthService;
 import com.cloudstorage.service.UserService;

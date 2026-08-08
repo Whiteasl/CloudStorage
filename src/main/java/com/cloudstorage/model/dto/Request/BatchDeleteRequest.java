@@ -1,4 +1,4 @@
-package com.cloudstorage.model.dto;
+package com.cloudstorage.model.dto.Request;
 
 import java.util.Set;
 

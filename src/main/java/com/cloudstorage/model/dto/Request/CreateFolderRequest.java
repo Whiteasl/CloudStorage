@@ -1,4 +1,4 @@
-package com.cloudstorage.model.dto;
+package com.cloudstorage.model.dto.Request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

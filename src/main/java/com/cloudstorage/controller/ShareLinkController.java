@@ -3,8 +3,8 @@ package com.cloudstorage.controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cloudstorage.service.ShareLinkService;
-import com.cloudstorage.model.dto.CreateShareRequest;
-import com.cloudstorage.model.dto.ShareLinkResponse;
+import com.cloudstorage.model.dto.Request.CreateShareRequest;
+import com.cloudstorage.model.dto.Response.ShareLinkResponse;
 
 import java.util.List;
 

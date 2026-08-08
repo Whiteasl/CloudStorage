@@ -1,4 +1,4 @@
-package com.cloudstorage.model.dto;
+package com.cloudstorage.model.dto.Request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -8,16 +8,13 @@ import lombok.Setter;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
 @Setter
+@Getter
 
-public class RegisterRequest {
+public class LoginRequest {
 
-    @NotBlank(message = "用户名不得为空")
+    @NotBlank(message = "用户名不能为空")
     private String username;
     @NotBlank(message = "密码不能为空")
     private String password;
-    @NotBlank(message = "邮箱用于查找密码，不能为空")
-    private String email;
-
 }

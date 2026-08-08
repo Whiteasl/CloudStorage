@@ -57,6 +57,22 @@ public class JwtTokenUtil {
     }
 
     /**
+     * 生成用于 忘记密码 对话的令牌
+     * 
+     * @param email 用户邮箱
+     * @return 令牌
+     */
+    public String generateForgotPasswordToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 20 * 60 * 1000))
+                .claim("email", email)
+                .signWith(key)
+                .compact();
+    }
+
+    /**
      * 解析令牌
      * 
      * @param token 令牌

@@ -7,7 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.cloudstorage.model.dto.RegisterRequest;
+import com.cloudstorage.model.dto.Request.RegisterRequest;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
 

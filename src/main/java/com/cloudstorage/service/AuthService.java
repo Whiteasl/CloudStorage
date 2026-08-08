@@ -8,8 +8,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.cloudstorage.model.dto.AuthResponse;
-import com.cloudstorage.model.dto.LoginRequest;
+import com.cloudstorage.model.dto.Request.LoginRequest;
+import com.cloudstorage.model.dto.Response.AuthResponse;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.util.JwtTokenUtil;

@@ -1,4 +1,4 @@
-package com.cloudstorage.model.dto;
+package com.cloudstorage.model.dto.Request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,13 +9,12 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
-public class MoveRequest {
+public class RenameRequest {
     /**
-     * 移动文件请求
+     * 重命名请求处理
      * 
-     * @Param targetFolderId 新目录 ID
+     * @Param newName 新名字
      */
 
-    private Long targetFolderId;
-
+    private String newName;
 }

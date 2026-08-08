@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.cloudstorage.model.dto.ShareLinkResponse;
+import com.cloudstorage.model.dto.Response.ShareLinkResponse;
 import com.cloudstorage.model.entity.*;
 import com.cloudstorage.repository.UserFileRepository;
 import com.cloudstorage.repository.UserRepository;
