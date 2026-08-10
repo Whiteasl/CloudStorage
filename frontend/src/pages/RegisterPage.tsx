@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { post } from "../api/client";
-import type { AuthResponse } from "../types";
+import type { AuthResponse } from "../types/dto/response/AuthResponse";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");

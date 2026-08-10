@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FileResponse } from "../types";
+import type { FileResponse } from "../types/dto/response/FileResponse";
 import { del, get, post, put, upload } from "../api/client";
 import { formatSize } from "../utils/format";
 

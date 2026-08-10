@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { FileResponse, ShareLinkResponse } from "../types";
+import type { ShareLinkResponse } from "../types/dto/response/ShareLinkResponse";
+import type { FileResponse } from "../types/dto/response/FileResponse";
 import { del, get, post } from "../api/client";
 
 export default function SharePage() {

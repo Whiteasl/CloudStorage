@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { post } from "../api/client";
-import type { AuthResponse } from "../types";
+import type { AuthResponse } from "../types/dto/response/AuthResponse";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function LoginPage() {

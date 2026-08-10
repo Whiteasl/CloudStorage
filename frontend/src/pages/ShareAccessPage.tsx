@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { ShareLinkResponse } from "../types";
+import type { ShareLinkResponse } from "../types/dto/response/ShareLinkResponse";
 import { get } from "../api/client";
 import { formatSize } from "../utils/format";
 
