@@ -183,7 +183,7 @@ public class PasswordResetService {
     /**
      * 校验 忘记密码 的Token是否正确
      * 
-     * @param token 校验 忘记密码 的Token
+     * @param token 校验 用户 的Token
      * @return String - 正确返回userId，错误返回null
      */
     public String validateResetPasswordToken(String token) {

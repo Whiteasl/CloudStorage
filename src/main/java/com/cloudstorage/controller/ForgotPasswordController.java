@@ -19,6 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * ForgotPasswordController
+ */
 @RestController
 public class ForgotPasswordController {
     private final PasswordResetService passwordResetService;
@@ -27,6 +30,7 @@ public class ForgotPasswordController {
         this.passwordResetService = passwordResetService;
     }
 
+    // 查询用户是否存在
     @PostMapping("/forgot-password")
     public ResponseEntity<ForgotPasswordResponse> forgotPasswordRequest(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -34,14 +38,16 @@ public class ForgotPasswordController {
         return ResponseEntity.ok(passwordResetService.forgotPassword(request.getEmail()));
     }
 
+    // 邮箱验证
     @PostMapping("/forgot-password/email")
-    public ResponseEntity<Void> forgotPasswordVerifyEmail(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<Void> forgotPasswordVerfifyEmail(@Valid @RequestBody ForgotPasswordRequest request) {
 
         passwordResetService.forgotPasswordEmail(request.getEmail());
 
         return ResponseEntity.ok().build();
     }
 
+    // 获取密保问题
     @PostMapping("/security-questions")
     public ResponseEntity<SecurityQuestionResponse> securityQuestions(
             @Valid @RequestBody SecurityQuestionRequest request) {
@@ -49,6 +55,7 @@ public class ForgotPasswordController {
         return ResponseEntity.ok(passwordResetService.getSecurityQuestion(request.getToken()));
     }
 
+    // 校验密保问题
     @PostMapping("/verify-answers")
     public ResponseEntity<VerifySecurityAnswerResponse> verifySecurityAnswers(
             @Valid @RequestBody VerifySecurityAnswerRequest request) {
@@ -56,6 +63,7 @@ public class ForgotPasswordController {
         return ResponseEntity.ok(passwordResetService.verifySecurityAnswers(request.getToken(), request.getAnswers()));
     }
 
+    // 验证Token
     @GetMapping("/forgot-password/validate")
     public ResponseEntity<Boolean> validateForgotToken(@RequestParam String token) {
 
@@ -64,6 +72,7 @@ public class ForgotPasswordController {
         return ResponseEntity.ok(userId != null);
     }
 
+    // 重置密码
     @PostMapping("/forgot-password/reset-password")
     public ResponseEntity<Void> resetForgotPassword(@Valid @RequestBody ResetPasswordRequest request) {
 

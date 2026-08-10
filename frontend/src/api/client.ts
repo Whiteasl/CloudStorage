@@ -7,6 +7,14 @@ function getToken(): string | null {
   return token;
 }
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const token: string | null = getToken();
 
@@ -24,7 +32,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error("未登录");
   }
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok)
+    throw new ApiError(`HTTP ${response.status}`, response.status);
 
   const text = await response.text();
   return text ? JSON.parse(text) : (undefined as T);
