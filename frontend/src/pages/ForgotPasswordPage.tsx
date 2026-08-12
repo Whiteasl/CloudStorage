@@ -9,6 +9,7 @@ import type { VerifySecurityAnswerRequest } from "../types/dto/request/VerifySec
 import type { SecurityQuestionRequest } from "../types/dto/request/SecurityQuestionRequest";
 import type { ForgotPasswordRequest } from "../types/dto/request/ForgotPasswordRequest";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
   // 记录找回方法 - 邮件验证/密保认证
@@ -173,7 +174,7 @@ export default function ForgotPasswordPage() {
         setMessage("验证成功，正在跳转到重置密码页面");
         setQuestions([]);
         setAnswers([]);
-        navigate(`/reset-password?token=${data.token}`);
+        navigate(`/forgot-password/reset?token=${data.token}`);
       } else {
         setMessage("验证失败");
         setAnswers([]);
@@ -228,6 +229,7 @@ export default function ForgotPasswordPage() {
               <button type="submit" disabled={loading}>
                 提交
               </button>
+              <Link to="/login">返回登录</Link>
             </form>
             {message != "" && <p>{message}</p>}
           </div>

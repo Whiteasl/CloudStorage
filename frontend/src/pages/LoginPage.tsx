@@ -54,6 +54,9 @@ export default function LoginPage() {
         <Link to="/register" className="auth-link">
           注册
         </Link>
+        <Link to="/forgot-password" className="auth-link">
+          忘记密码
+        </Link>
       </form>
     </div>
   );
