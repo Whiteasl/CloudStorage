@@ -40,7 +40,7 @@ public class ForgotPasswordController {
 
     // 邮箱验证
     @PostMapping("/forgot-password/email")
-    public ResponseEntity<Void> forgotPasswordVerfifyEmail(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<Void> forgotPasswordVerifyEmail(@Valid @RequestBody ForgotPasswordRequest request) {
 
         passwordResetService.forgotPasswordEmail(request.getEmail());
 
@@ -73,7 +73,7 @@ public class ForgotPasswordController {
     }
 
     // 重置密码
-    @PostMapping("/forgot-password/reset-password")
+    @PostMapping("/forgot-password/reset")
     public ResponseEntity<Void> resetForgotPassword(@Valid @RequestBody ResetPasswordRequest request) {
 
         passwordResetService.resetPassword(request.getToken(), request.getNewPassword());

@@ -40,6 +40,9 @@ public class PasswordResetService {
     @Value("${cloudstorage.mail.reset-password-subject}")
     private String resetPasswordSubject;
 
+    @Value("${cloudstorage.password-reset.token-expiration-minutes}")
+    private long resetPasswordExpirationTime;
+
     public PasswordResetService(StringRedisTemplate redis, UserRepository userRepository,
             SecurityQuestionRepository securityQuestionRepository, PasswordEncoder passwordEncoder,
             MailClient mailClient, JwtTokenUtil jwtTokenUtil) {
@@ -78,7 +81,7 @@ public class PasswordResetService {
 
         String token = this.generateTokenAndSaved(user);
 
-        String link = this.baseURL + "/forgot-password/validate?token=" + token;
+        String link = this.baseURL + "/forgot-password/reset?token=" + token;
 
         mailClient.resetPasswordSend(email, resetPasswordSubject, link, token);
 
@@ -144,7 +147,7 @@ public class PasswordResetService {
 
         double probability = count / securityQuestions.size();
 
-        if (probability > 0.75) {
+        if (probability >= 0.75) {
             String token = this.generateTokenAndSaved(user);
             return new VerifySecurityAnswerResponse(true, token);
         }
@@ -163,7 +166,8 @@ public class PasswordResetService {
         String userId = this.validateResetPasswordToken(token);
 
         if (userId == null || userId.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "账户异常");
+            // 无效 Token 检查
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "无效Token");
         }
 
         User user = userRepository.findById(Long.valueOf(userId))
@@ -204,7 +208,9 @@ public class PasswordResetService {
 
     private String generateTokenAndSaved(User user) {
         String token = jwtTokenUtil.generateToken(user);
-        redis.opsForValue().set("reset:token:" + token, String.valueOf(user.getId()), Duration.ofMinutes(20));
+
+        redis.opsForValue().set("reset:token:" + token, String.valueOf(user.getId()),
+                Duration.ofMinutes(resetPasswordExpirationTime));
 
         return token;
     }
