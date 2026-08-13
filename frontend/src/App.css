@@ -220,6 +220,139 @@ tbody tr:hover {
   font-size: 14px;
 }
 
+/* ===== Forgot / Reset Password ===== */
+.forgot-password,
+.forgot-reset-password {
+  max-width: 440px;
+  margin: 80px auto;
+  padding: 32px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.forgot-password h1,
+.forgot-reset-password h1,
+.reset-password h1 {
+  text-align: center;
+  font-size: 22px;
+  color: var(--text-h);
+  margin-bottom: 24px;
+}
+
+.forgot-password form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.forgot-password label,
+.reset-password form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* 返回链接（返回登录 / 返回上一步） */
+.forgot-password .step-1 > a,
+.forgot-password .message > a,
+.forgot-password .step-3 > a,
+.forgot-reset-password > a {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-light);
+  transition: color 0.15s;
+}
+
+.forgot-password .step-1 > a:hover,
+.forgot-password .message > a:hover,
+.forgot-password .step-3 > a:hover,
+.forgot-reset-password > a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* 主提交按钮（与 auth-page 一致） */
+.forgot-password button[type="submit"],
+.reset-password button[type="submit"] {
+  width: 100%;
+  justify-content: center;
+  padding: 10px;
+  font-size: 15px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+
+.forgot-password button[type="submit"]:hover,
+.reset-password button[type="submit"]:hover {
+  background: var(--accent);
+  color: #fff;
+  opacity: 0.9;
+}
+
+/* 找回方式选择按钮 */
+.step-1 form button {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 15px;
+}
+
+/* 表单内的链接（如“返回登录”） */
+.forgot-password form > a {
+  display: block;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* 提示信息（成功 / 失败共用，统一为柔和提示框） */
+.forgot-password p,
+.forgot-reset-password p,
+.reset-password p {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--accent-bg);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text-h);
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* 消息区的“重试”按钮 */
+.forgot-password .message button {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* 重置密码表单：两个输入框挤在同一个 label 里，用间距分开 */
+.reset-password form input {
+  margin-bottom: 10px;
+}
+
+/* 修改成功后“去登录”按钮化链接 */
+.reset-password > a {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  font-size: 15px;
+  color: #fff;
+  background: var(--accent);
+  border-radius: var(--radius);
+  transition: opacity 0.15s;
+}
+
+.reset-password > a:hover {
+  opacity: 0.9;
+  text-decoration: none;
+}
+
 /* ===== Share Create Form ===== */
 .create-share-section {
   margin-bottom: 28px;

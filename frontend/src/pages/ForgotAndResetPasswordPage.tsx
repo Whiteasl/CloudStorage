@@ -22,6 +22,7 @@ function ResetPassword({ token }: { token: string }) {
   return (
     <>
       <div className="reset-password">
+        <h1>重置密码</h1>
         {message == "" && (
           <form
             onSubmit={async (e) => {
@@ -29,9 +30,12 @@ function ResetPassword({ token }: { token: string }) {
               if (newPassword === repeatPassword)
                 try {
                   setLoading(true);
-                  if ((await submitPassword(token, newPassword)) === null) {
+                  const result = await submitPassword(token, newPassword);
+                  if (result === null) {
                     setMessage("修改成功，请登录");
                     setSuccess(true);
+                  } else {
+                    setMessage(result);
                   }
                 } finally {
                   setLoading(false);
@@ -157,6 +161,7 @@ export default function ForgotAndResetPasswordPage() {
           <ResetPassword token={resetToken} />
         ) : (
           <>
+            <h1>重置密码</h1>
             <Link to="/forgot-password">返回</Link>
             <p>{message}</p>
           </>
