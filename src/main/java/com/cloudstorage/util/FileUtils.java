@@ -1,8 +1,15 @@
 package com.cloudstorage.util;
 
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -31,7 +38,7 @@ public class FileUtils {
     private final StorageService storageService;
 
     public FileUtils(UserFileRepository userFileRepository, UserRepository userRepository,
-            StorageService storageService) {
+            StorageService storageService, FileUtils fileUtils) {
         this.userFileRepository = userFileRepository;
         this.userRepository = userRepository;
         this.storageService = storageService;
@@ -52,17 +59,21 @@ public class FileUtils {
 
         Path tempZip;
         try {
+            // 创建临时文件，用于后续存储压缩文件
             tempZip = Files.createTempFile(archiveName, ".zip");
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "临时文件创建错误，请联系管理员处理");
         }
 
+        // 开始对文件进行压缩，生成压缩包
         try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(tempZip))) {
 
             for (UserFile uf : userFiles) {
                 // 压缩目录
                 if (uf.isFolder()) {
-                    ZipEntry dirEntry = new ZipEntry(uf.getFilePath() + "/");
+                    // 获取文件夹逻辑路径
+                    ZipEntry dirEntry = new ZipEntry(
+                            storageService.resolveLogicalPath(uf.getId(), userId) + "/");
                     zos.putNextEntry(dirEntry);
                     zos.closeEntry();
 
@@ -73,9 +84,12 @@ public class FileUtils {
 
                     for (UserFile child : children) {
                         if (!child.isFolder()) {
-
-                            Path diskPath = storageService.validatePath(userId, child.getFilePath());
-                            ZipEntry entry = new ZipEntry(child.getFilePath());
+                            // 子文件是文件时
+                            // 获取文件的磁盘路径
+                            String logical = storageService.resolveLogicalPath(child.getId(), userId);
+                            Path diskPath = storageService.validatePath(userId, logical);
+                            // 添加到压缩文件中
+                            ZipEntry entry = new ZipEntry(logical);
                             zos.putNextEntry(entry);
                             Files.copy(diskPath, zos);
                             zos.closeEntry();
@@ -83,10 +97,10 @@ public class FileUtils {
                     }
 
                 } else {
-                    // 压缩文件
+                    // 压缩对象是文件时
 
-                    Path diskPath = storageService.validatePath(userId, uf.getFilePath());
-                    ZipEntry entry = new ZipEntry(uf.getFilePath());
+                    Path diskPath = storageService.resolveRealPath(uf.getId(), userId);
+                    ZipEntry entry = new ZipEntry(storageService.resolveLogicalPath(uf.getId(), userId));
                     zos.putNextEntry(entry);
                     Files.copy(diskPath, zos);
                     zos.closeEntry();
@@ -138,4 +152,49 @@ public class FileUtils {
         }
 
     }
+
+    /**
+     * 递归删除
+     * 
+     * @param folderId Path - 需要被删除的文件夹
+     * @return boolean - 删除失败时返回 false
+     * @throws IOException - Files.delete 的异常处理
+     */
+    public void deleteRecursively(Path delDir) throws IOException {
+
+        if (Files.exists(delDir)) {
+            Files.walkFileTree(delDir, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+
+    }
+
+    // /**
+    // * 辅助方法，用于检测文件夹是否为空文件夹
+    // *
+    // * @param checkDir Path - 待检测文件夹
+    // * @return boolean - 空文件夹返回true
+    // * @throws IOException 文件不存在，抛出 IOException，交给上层处理
+    // */
+    // private boolean isEmptyDir(Path checkDir) throws IOException {
+    // if (Files.exists(checkDir)) {
+    // try (DirectoryStream<Path> stream = Files.newDirectoryStream(checkDir)) {
+    // return !stream.iterator().hasNext();
+    // }
+    // } else {
+    // throw new IOException();
+    // }
+
+    // }
 }

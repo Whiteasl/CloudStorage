@@ -63,7 +63,6 @@ public class FileController {
         return new FileResponse(
                 uf.getId(),
                 uf.getFilename(),
-                uf.getFilePath(),
                 uf.getFileSize(),
                 uf.getContentType(),
                 uf.isFolder(),

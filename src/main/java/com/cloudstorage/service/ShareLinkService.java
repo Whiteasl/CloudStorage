@@ -110,8 +110,8 @@ public class ShareLinkService {
         shareLink.setDownloadCount(++downloadCount);
         shareLinkRepository.save(shareLink);
 
-        Path diskPath = storageService.validatePath(shareLink.getOwner().getId(),
-                shareLink.getShareFile().getFilePath());
+        // 获取分享文件的真实文件路径
+        Path diskPath = storageService.resolveRealPath(shareLink.getShareFile().getId(), shareLink.getOwner().getId());
 
         return new FileSystemResource(diskPath);
     }

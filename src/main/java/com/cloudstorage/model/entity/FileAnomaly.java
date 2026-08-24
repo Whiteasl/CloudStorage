@@ -56,7 +56,7 @@ public class FileAnomaly {
     private AnomalyType anomalyType; // 异常类型
 
     @Column(nullable = false)
-    private String description; // 异常文件
+    private String description; // 异常信息
 
     @CreatedDate
     @Column(updatable = false)
