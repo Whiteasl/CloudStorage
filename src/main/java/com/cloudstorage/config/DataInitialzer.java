@@ -58,7 +58,7 @@ public class DataInitialzer implements CommandLineRunner {
 
         storageService.initUserDirectory(user.getId());
 
-        System.out.println("[DataInitialzer] 创建初始用户：" + username + "( " + role + ")");
-        System.out.println("[DataInitialzer] 密码：" + password);
+        System.out.println("[DataInitializer] 创建初始用户：" + username + "( " + role + ")");
+        System.out.println("[DataInitializer] 密码：" + password);
     }
 }

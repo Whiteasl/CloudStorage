@@ -16,12 +16,15 @@ public class MailClient {
     private RestTemplate restTemplate = new RestTemplate();
     private String authToken;
     private String serviceUrl;
+    private String baseUrl;
     private static final Logger log = LoggerFactory.getLogger(MailClient.class);
 
     public MailClient(@Value("${cloudstorage.mail.auth-token}") String authToken,
-            @Value("${cloudstorage.mail.service-url}") String serviceUrl) {
+            @Value("${cloudstorage.mail.service-url}") String serviceUrl,
+            @Value("${cloudstorage.app.base-url}") String baseUrl) {
         this.authToken = authToken;
         this.serviceUrl = serviceUrl;
+        this.baseUrl = baseUrl;
     }
 
     public void resetPasswordSend(String to, String subject, String text, String token) {
@@ -40,7 +43,7 @@ public class MailClient {
             log.info("密码重置邮件已发送至 {} ", to);
         } catch (Exception e) {
             log.warn("邮件服务不可达 ({}) , 重置链接已输出到日志", e.getMessage());
-            log.info("重置链接：http://localhost:5173/reset-password?token={}", token);
+            log.info("重置链接：{}/forgot-password/reset?token={}", baseUrl, token);
         }
     }
 

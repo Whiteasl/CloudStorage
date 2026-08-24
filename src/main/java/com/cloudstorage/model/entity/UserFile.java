@@ -40,8 +40,8 @@ public class UserFile {
     @Column(nullable = false)
     private String filename;
 
-    @Column(nullable = false)
-    private String filePath; // 存储文件全路径 真实文件路径+文件名
+    // @Column(nullable = false)
+    // private String filePath; // 存储文件全路径 真实文件路径+文件名
 
     @Column(nullable = false)
     private long fileSize; // 字节数（文件大小）
@@ -51,7 +51,8 @@ public class UserFile {
     @JsonProperty("isFolder")
     private boolean isFolder = false; // 分辨是否为文件夹，默认为 false，文件夹设置为 true
 
-    private Long parentFolderId; // 子目录所属的父级目录， null 为根目录，其他值=所属文件夹 ID
+    @Column(nullable = false)
+    private Long parentFolderId = 0L; // 子目录所属的父级目录， null 为根目录，其他值=所属文件夹 ID
 
     @ManyToOne
     @JoinColumn(name = "owner_id")

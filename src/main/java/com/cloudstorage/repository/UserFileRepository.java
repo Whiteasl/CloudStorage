@@ -35,4 +35,8 @@ public interface UserFileRepository extends JpaRepository<UserFile, Long> {
 
     List<UserFile> findByOwnerAndParentFolderIdAndIsFolder(User owner, Long parentFolderId, boolean isFolder); // 导航时区分文件/目录
 
+    Optional<UserFile> findByIdAndOwner_Id(Long id, Long ownerId); // 根据文件ID和拥有者ID查找文件
+
+    List<UserFile> findAllByOwner(User owner); // 拉取用户所有文件，检查器全量扫描时需要使用
+
 }
