@@ -27,4 +27,6 @@ public interface ShareLinkRepository extends JpaRepository<ShareLink, Long> {
 
     void deleteByShareFileIn(List<UserFile> shareFiles); // 级联删除时防止分享链接卡住删除操作
 
+    void deleteByShareFile(UserFile shareFile); // 根据文件实体删除分享链接
+
 }

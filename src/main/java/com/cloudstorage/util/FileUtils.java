@@ -137,17 +137,17 @@ public class FileUtils {
     /**
      * 通过递归获取目录下的所有子文件/目录
      * 
-     * @param owner    目录拥有者
-     * @param folderId 目录ID
-     * @param allFiles 传入的列表
+     * @param owner    User - 目录拥有者
+     * @param folderId Long - 目录ID
+     * @param files    List<UserFile> - 收集文件的列表
      */
-    public void collectSubdirectories(User owner, Long folderId, List<UserFile> allFiles) {
+    public void collectSubdirectories(User owner, Long folderId, List<UserFile> files) {
 
         List<UserFile> children = userFileRepository.findByOwnerAndParentFolderId(owner, folderId);
         for (UserFile child : children) {
-            allFiles.add(child);
+            files.add(child);
             if (child.isFolder()) {
-                collectSubdirectories(owner, child.getId(), allFiles);
+                collectSubdirectories(owner, child.getId(), files);
             }
         }
 

@@ -9,7 +9,7 @@ public enum AnomalyType {
     PARENT_MISSING("文件的父目录不存在: "), // TREE : parentFolderId 指向不存在的行
     PARENT_NOT_FOLDER("文件路径节点错误：父节点不是文件夹: "), // TREE : 父节点不是文件夹
     DUP_LOGICAL("同用户下两行推导出同一个逻辑路径: "), // TREE : 同用户下两行推导出同一个逻辑路径
-    CLEANUP_FAILED("清理后残留文件: "), // CLEANUP : 残留文件
+    CLEANUP_FAILED("清理失败的残留文件: "), // CLEANUP : 残留文件
     USERDIR_NOT_EXIST("用户根文件夹不存在: "); // USERDIR_NOT_EXIST : 用户的根文件夹在磁盘中不存在
 
     private final String description;

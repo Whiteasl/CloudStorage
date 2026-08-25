@@ -1,9 +1,11 @@
 package com.cloudstorage.service;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -12,10 +14,12 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -42,6 +46,7 @@ public class FileService {
     private final ShareLinkRepository shareLinkRepository;
     private final FileAnomalyRepository fileAnomalyRepository;
     private final static Logger log = LoggerFactory.getLogger(FileService.class);
+    private final TransactionTemplate transactionTemplate;
 
     private final static Long ROOT_FOLDER_ID = 0L;
 
@@ -55,6 +60,7 @@ public class FileService {
         this.platformTransactionManager = platformTransactionManager;
         this.shareLinkRepository = shareLinkRepository;
         this.fileAnomalyRepository = fileAnomalyRepository;
+        this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
     }
 
     /**
@@ -66,7 +72,6 @@ public class FileService {
      * @param parentFolderId Long - 存储上传文件的文件夹ID
      * 
      */
-    // @Transactional
     public void uploadFile(MultipartFile file, Long userId, Long parentFolderId) {
 
         // 查用户
@@ -74,57 +79,118 @@ public class FileService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户，请联系管理员解决"));
         Long storageUsed = owner.getStorageUsed(); // 获取用户已用配额
 
-        // 存储逻辑路径
-        String logical;
-
-        if (parentFolderId == null)
-            // 如果处于根目录中，则直接存储其文件名
-            logical = file.getOriginalFilename();
-        else {
-            // 不处于根目录中，获取逻辑路径
-            // UserFile parentFolder = userFileRepository.findByIdAndOwner(parentFolderId,
-            // owner)
-            // .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-            // "父目录不存在"));
-            // logical = parentFolder.getFilePath() + "/" + file.getOriginalFilename();
-            logical = storageService.resolveLogicalPath(parentFolderId, userId) + "/" + ".tmp---"
-                    + UUID.randomUUID().toString() + ".tmp";
+        // 规范化文件夹ID 并对文件夹进行检查
+        final Long safeParent = normalizeParentId(parentFolderId);
+        if (safeParent != 0) {
+            ensureParentFolder(owner, safeParent);
         }
-
-        // 从逻辑路径中解析出真实路径
-        Path diskPath = storageService.validatePath(userId, logical);
 
         // 分别检查配额问题和命名问题
         if (file.getSize() + storageUsed > owner.getStorageQuota())
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户配额不足");
 
         if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(file.getOriginalFilename(), owner,
-                parentFolderId))
+                safeParent))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "目录下已存在同名");
 
-        // 更新数据库数据
-        // 把文件写入到磁盘中
+        // 路径构造，分为 临时存储路径 和 存储路径
+        // 存储路径 - 逻辑路径
+        String logical = safeParent == 0L ? file.getOriginalFilename()
+                : storageService.resolveLogicalPath(safeParent, userId) + "/" + file.getOriginalFilename();
+
+        // 存储路径 - 通过逻辑路径推导出的 Path
+        Path diskPath = storageService.validatePath(userId, logical);
+
+        // 上传文件时用的同路径下的临时文件名
+        Path tempPath = diskPath.resolveSibling(".tmp---" + UUID.randomUUID().toString() + ".tmp");
+
+        // 磁盘操作
         try {
-            UserFile uf = new UserFile();
+            // 把上传流接入临时文件
+            Files.copy(file.getInputStream(), tempPath);
 
-            uf.setFilename(file.getOriginalFilename());
-            uf.setFileSize(file.getSize());
-            // uf.setFilePath(relativePath);
-            uf.setParentFolderId(parentFolderId);
-            uf.setOwner(owner);
-            uf.setParentFolderId(parentFolderId);
-            uf.setContentType(file.getContentType());
-            // 更新用户配额已使用量
-            owner.setStorageUsed(owner.getStorageUsed() + file.getSize());
-
-            userFileRepository.save(uf);
-            userRepository.save(owner);
-
-            Files.copy(file.getInputStream(), diskPath);
-
-            storageService.removeExecutePermission(diskPath);
-
+            try {
+                // 对临时文件进行原子改名
+                Files.move(tempPath, diskPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                // 文件系统不支持原子改名时抛出错误
+                // 修改为：普通改名操作
+                Files.move(tempPath, diskPath, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
+            // 上传失败
+            // 删除临时文件并抛出 500 错误
+            try {
+                Files.deleteIfExists(tempPath);
+            } catch (IOException ignored) {
+                // 清理失败，遗留文件不再管理，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+
+            }
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件上传失败");
+        }
+
+        // 去权限步骤
+        try {
+            storageService.removeExecutePermission(diskPath);
+        } catch (RuntimeException e) {
+            // 去权限操作失败
+            // 删除文件并抛出 500 错误
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException ignored) {
+                // 清理失败，遗留文件不再管理，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+
+            }
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件上传失败");
+        }
+
+        // 更新数据库数据
+        try {
+
+            this.transactionTemplate.executeWithoutResult(status -> {
+                UserFile uf = new UserFile();
+                // 文件信息更新
+                uf.setFilename(file.getOriginalFilename());
+                uf.setContentType(file.getContentType());
+                uf.setFileSize(file.getSize());
+                uf.setOwner(owner);
+                uf.setParentFolderId(safeParent);
+
+                userFileRepository.save(uf);
+
+                // 用户配额信息更新
+                owner.setStorageUsed(storageUsed + file.getSize());
+
+                userRepository.save(owner);
+
+            });
+        } catch (DataIntegrityViolationException e) {
+            // 并发竞态唯一约束触发
+            // 删除文件，抛出409错误
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException ignored) {
+                // 清理失败，遗留文件不再管理，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目录下已存在同名文件");
+        } catch (RuntimeException e) {
+            // 数据库更新失败
+            // 删除文件，抛出 500 错误
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException ignored) {
+                // 清理失败，不再管理遗留文件，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+            }
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件上传失败");
         }
 
@@ -133,9 +199,9 @@ public class FileService {
     /**
      * 下载文件 业务
      * 
-     * @param fileId 被下载的文件的ID
-     * @param userId 文件所有者ID
-     * @return 成功 则返回一个文件内容流
+     * @param fileId Long - 被下载的文件的ID
+     * @param userId Long - 文件所有者ID
+     * @return FileSystemResource 返回一个文件内容流
      */
 
     public FileSystemResource downloadFile(Long fileId, Long userId) {
@@ -147,12 +213,14 @@ public class FileService {
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户")))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到文件")); // 获取文件实体
 
-        Path diskPath = storageService.validatePath(userId, uf.getFilePath()); // 转换成磁盘路径
-
         // 不允许下载文件夹
         // 后续实现文件夹打包成压缩包下载的功能
         if (uf.isFolder())
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "文件夹不允许被下载");
+
+        // Path diskPath = storageService.validatePath(userId, uf.getFilePath());
+        // 转换成磁盘路径
+        Path diskPath = storageService.resolveRealPath(fileId, userId);
 
         return new FileSystemResource(diskPath);
     }
@@ -160,48 +228,75 @@ public class FileService {
     /**
      * 创建目录功能
      * 
-     * @param folderName     目录名
-     * @param userId         所有者ID
-     * @param parentFolderId 目录所在目录的ID
+     * @param folderName     String - 目录名
+     * @param userId         Long - 所有者ID
+     * @param parentFolderId Long - 目录所在目录的ID
      */
-    @Transactional
     public void createFolder(String folderName, Long userId, Long parentFolderId) {
 
-        // 创建用户实体
+        // 获取用户实体
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "请检查用户是否存在"));
 
-        // 获取父目录路径
-        String relativePath;
-        if (parentFolderId == null)
-            relativePath = folderName;
+        // 文件路径 - 逻辑路径和磁盘路径
+        String logical;
+        Path diskPath;
 
-        else {
-            UserFile parentFolder = userFileRepository.findByIdAndOwner(parentFolderId, owner)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "父目录不存在，请检查路径地址是否正确"));
-            relativePath = parentFolder.getFilePath() + "/" + folderName;
+        // 规范化文件夹ID
+        Long checkedParentId = normalizeParentId(parentFolderId);
+        if (checkedParentId != 0L)
+            ensureParentFolder(owner, checkedParentId);
+
+        // 同名检查
+        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(folderName, owner, checkedParentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件夹");
         }
 
-        // 创建 UserFile 实体，并进行填充
-        UserFile uf = new UserFile();
+        // 路径处理
+        logical = checkedParentId == 0L ? folderName
+                : storageService.resolveLogicalPath(checkedParentId, userId) + "/" + folderName;
+        diskPath = storageService.validatePath(userId, logical);
 
-        uf.setFilename(folderName);
-        uf.setOwner(owner);
-        uf.setFileSize(0);
-        uf.setFilePath(relativePath);
-        uf.setFolder(true);
-        uf.setParentFolderId(parentFolderId);
-
-        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(folderName, owner, parentFolderId))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "创建失败：该目录下已有同名目录");
-
-        userFileRepository.save(uf);
-
-        // 创建真实目录
+        // 创建文件夹
         try {
-            Files.createDirectory(storageService.validatePath(userId, relativePath));
+            Files.createDirectory(diskPath);
+        } catch (FileAlreadyExistsException e) {
+            recordAnomaly(owner, AnomalyType.ORPHAN, null, logical, AnomalyType.ORPHAN.getDescription() + "同名目录残留");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹中存在同名残留，请联系管理员处理");
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "目录创建失败");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件夹创建失败");
+        }
+
+        // 更新数据库
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                UserFile uf = new UserFile();
+                uf.setFilename(folderName);
+                uf.setParentFolderId(checkedParentId);
+                uf.setFileSize(0);
+                uf.setOwner(owner);
+                uf.setFolder(true);
+
+                userFileRepository.save(uf);
+            });
+        } catch (DataIntegrityViolationException e) {
+            try {
+                Files.deleteIfExists(diskPath);
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件夹");
+
+            } catch (IOException ignored) {
+                // 无法删除，直接不管
+                log.warn("[*] createFolder: Failed to clean up residual directory: " + e.getMessage());
+            }
+        } catch (RuntimeException e) {
+            try {
+                Files.deleteIfExists(diskPath);
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件夹创建失败");
+
+            } catch (IOException ignored) {
+                // 无法删除，直接不管
+                log.warn("[*] createFolder: Failed to clean up residual directory: " + e.getMessage());
+            }
         }
 
     }
@@ -209,56 +304,107 @@ public class FileService {
     /**
      * 获取目录下的所有文件和文件夹
      * 
-     * @param userId         目录所有者ID
-     * @param parentFolderId 目录ID
-     * @return 成功 则返回一个包含 UserFile 实体的列表
+     * @param userId         Long - 目录所有者ID
+     * @param parentFolderId Long - 目录ID
+     * @return List<UserFile> 返回一个包含 UserFile 实体的列表
      */
     public List<UserFile> listFiles(Long userId, Long parentFolderId) {
 
-        return userFileRepository.findByOwnerAndParentFolderId(userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户")), parentFolderId);
+        // 获取用户实体
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
+
+        // 规范化文件夹ID
+        Long checkedParentId = normalizeParentId(parentFolderId);
+
+        if (checkedParentId != 0L)
+            // 检查文件夹合理性
+            ensureParentFolder(owner, checkedParentId);
+
+        return userFileRepository.findByOwnerAndParentFolderId(owner, checkedParentId);
     }
 
     /**
      * 删除文件
      * 
-     * @param fileId 文件ID
-     * @param userId 文件所有者ID
+     * @param fileId Long - 文件ID
+     * @param userId Long - 文件所有者ID
      */
-    @Transactional
     public void deleteFile(Long fileId, Long userId) {
 
-        // 检验文件归属
+        // 检验文件归属 并 获取用户实体和文件实体
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "请检查文件归属者是否正确"));
         UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到文件，请检查文件是否正确"));
 
-        // 检查目录下是否有文件：非空目录不允许删除
-        // 暂时没有实现递归删除目录的功能，先进行记录，后续进行实现
-        if (uf.isFolder() && !userFileRepository.findByOwnerAndParentFolderId(owner, uf.getId()).isEmpty())
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "目录不为空，请先删除子文件");
+        // 收集文件夹中的子文件数量
+        List<UserFile> files = new ArrayList<>();
 
+        if (uf.isFolder()) {
+
+            fileUtil.collectSubdirectories(owner, fileId, files);
+            files.add(uf);
+
+        } else {
+            files.add(uf);
+        }
+
+        // 路径处理
+        String logical = storageService.resolveLogicalPath(fileId, userId);
+        Path diskPath = storageService.validatePath(userId, logical);
+
+        // 统计被释放的存储空间
+        Long totalSize = 0L;
+
+        for (UserFile file : files) {
+            totalSize += file.getFileSize();
+        }
+
+        final Long finalSize = totalSize;
+
+        // 更新数据库
         try {
-            Files.delete(storageService.validatePath(userId, uf.getFilePath()));
-        } catch (IOException e) {
+            transactionTemplate.executeWithoutResult(status -> {
+                shareLinkRepository.deleteByShareFileIn(files);
+                userFileRepository.deleteAll(files);
+
+                owner.setStorageUsed(owner.getStorageUsed() - finalSize);
+                userRepository.save(owner);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // 因为磁盘文件没有动，所以不需要额外操作
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件被其他数据引用，无法删除");
+        } catch (RuntimeException e) {
+            // 因为磁盘文件没有动，所以不需要额外操作
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件删除失败");
         }
 
-        // 设置用户配额
-        owner.setStorageUsed(owner.getStorageUsed() - uf.getFileSize());
-        userRepository.save(owner);
+        // 删除文件
+        if (uf.isFolder()) {
+            try {
+                fileUtil.deleteRecursively(diskPath);
+            } catch (IOException e) {
+                recordAnomaly(owner, AnomalyType.CLEANUP_FAILED, null, logical,
+                        AnomalyType.CLEANUP_FAILED.getDescription() + e.getMessage());
+            }
+        } else {
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException e) {
+                recordAnomaly(owner, AnomalyType.CLEANUP_FAILED, null, logical,
+                        AnomalyType.CLEANUP_FAILED.getDescription() + e.getMessage());
+            }
+        }
 
-        // 删除数据库中的文件索引
-        userFileRepository.deleteByIdAndOwner(fileId, owner);
     }
 
     /**
      * 重命名
      * 
-     * @param fileId  文件ID
-     * @param userId  文件所有者ID
-     * @param newName 新名字
+     * @param fileId  Long - 文件ID
+     * @param userId  Long - 文件所有者ID
+     * @param newName String - 新名字
      */
     @Transactional
     public void renameFile(Long fileId, Long userId, String newName) {
