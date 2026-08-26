@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -18,7 +19,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -218,7 +218,6 @@ public class FileService {
         if (uf.isFolder())
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "文件夹不允许被下载");
 
-        // Path diskPath = storageService.validatePath(userId, uf.getFilePath());
         // 转换成磁盘路径
         Path diskPath = storageService.resolveRealPath(fileId, userId);
 
@@ -282,21 +281,21 @@ public class FileService {
         } catch (DataIntegrityViolationException e) {
             try {
                 Files.deleteIfExists(diskPath);
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件夹");
 
             } catch (IOException ignored) {
                 // 无法删除，直接不管
                 log.warn("[*] createFolder: Failed to clean up residual directory: " + e.getMessage());
             }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件夹");
         } catch (RuntimeException e) {
             try {
                 Files.deleteIfExists(diskPath);
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件夹创建失败");
 
             } catch (IOException ignored) {
                 // 无法删除，直接不管
                 log.warn("[*] createFolder: Failed to clean up residual directory: " + e.getMessage());
             }
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件夹创建失败");
         }
 
     }
@@ -406,16 +405,8 @@ public class FileService {
      * @param userId  Long - 文件所有者ID
      * @param newName String - 新名字
      */
-    @Transactional
     public void renameFile(Long fileId, Long userId, String newName) {
-        /**
-         * 重命名
-         * 把 指定文件/目录 重命名
-         * 
-         * @param fileId  指定文件/目录 ID
-         * @param userId  用户 ID
-         * @param newName 新名字
-         */
+
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
         UserFile uf = userFileRepository.findByIdAndOwner(fileId, owner)
@@ -423,122 +414,105 @@ public class FileService {
 
         // 检查重名
         if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(newName, owner, uf.getParentFolderId()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "目录下已有同名文件");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件");
 
-        // 对文件进行重命名
-        if (!uf.isFolder()) {
-            String oldPath = uf.getFilePath();
-            int slash = oldPath.lastIndexOf('/');
-            String newPath = slash == -1 ? newName : oldPath.substring(0, slash + 1) + newName; // 检查文件是否在根目录下
+        // 对文件夹进行重命名
+        // 文件中的 parentFolderId 存储的是文件夹的ID，所以直接更改文件夹的文件名对子文件不会有任何影响
 
-            uf.setFilePath(newPath);
-            uf.setFilename(newName);
+        // 获取路径 - 逻辑路径 磁盘路径
+        String oldLogical = storageService.resolveLogicalPath(fileId, userId);
+        Path oldDiskPath = storageService.validatePath(userId, oldLogical);
 
-            userFileRepository.save(uf);
+        int slash = oldLogical.lastIndexOf("/");
+        String newLogical = slash == -1 ? newName : oldLogical.substring(0, slash + 1) + newName;
+        Path newDiskPath = storageService.validatePath(userId, newLogical);
 
-            try {
-                Files.move(storageService.validatePath(userId, oldPath), storageService.validatePath(userId, newPath));
-            } catch (IOException e) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "重命名失败");
-            }
-        } else {
-            // 文件夹重命名
-            // 文件夹重命名较为繁琐
-            // 重命名文件夹的方法有两种：
-            // 1、全路径存储（当期方案）：在数据库中存储文件的全路径。对文件夹重命名时需要遍历所有子文件，对子文件路径逐个修改
-            // 2、路径拼接：不在数据库中存储文件的全路径，路径通过 parentFolderId 进行拼接，有多少个 parentFolderId
-            // 就拼接多少个目录，直到 null
+        // 先进行数据库操作，再进行磁盘操作，避免磁盘修改了名字但数据库没有更改
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                uf.setFilename(newName);
+                userFileRepository.save(uf);
+                try {
+                    Files.move(oldDiskPath, newDiskPath, StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    // 重命名失败，回滚所有操作
+                    log.warn("[*] renameFile: Failed to rename file : " + e.getMessage());
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "重命名失败");
 
-            String oldPath = uf.getFilePath(); // 获取文件路径
-            int slash = oldPath.lastIndexOf('/');
-            String newPath = slash == -1 ? newName : oldPath.substring(0, slash + 1) + newName; // 定义新路径
-
-            uf.setFilename(newName);
-            uf.setFilePath(newPath);
-            userFileRepository.save(uf);
-
-            try {
-                Files.move(storageService.validatePath(userId, oldPath),
-                        storageService.validatePath(userId, newPath));
-            } catch (IOException e) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "重命名失败");
-            }
-
-            // 递归收集所有子文件
-            List<UserFile> allFiles = new ArrayList<>();
-            fileUtil.collectSubdirectories(owner, uf.getId(), allFiles);
-
-            // 递归重命名子文件的路径
-            for (UserFile child : allFiles) {
-                String childOldPath = child.getFilePath(); // 获取旧路径
-                String childNewPath = newPath + childOldPath.substring(oldPath.length()); // 获取新路径
-                child.setFilePath(childNewPath); // 设置新路径
-                userFileRepository.save(child);
-
-            }
-
+                }
+            });
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹中已有同名文件");
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件重命名失败");
         }
+
+        sweepOldPath(oldDiskPath, owner, oldLogical);
+
     }
 
     /**
-     * 移动文件
+     * 把指定文件移动到目标文件夹下
      * 
-     * @param sourceId       源文件ID
-     * @param userId         文件所有者ID
-     * @param targetFolderId 目标目录的ID
+     * @param sourceId       Long - 源文件ID
+     * @param userId         Long - 文件所有者ID
+     * @param targetFolderId Long - 目标文件夹ID
      */
-    @Transactional
     public void moveFile(Long sourceId, Long userId, Long targetFolderId) {
 
+        // 规范化文件ID
+        Long checkedSourceId = normalizeParentId(sourceId);
+        Long checkedTargetId = normalizeParentId(targetFolderId);
+
+        // 获取用户实体
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标用户"));
-        UserFile source = userFileRepository.findByIdAndOwner(sourceId, owner)
+
+        // 检查文件夹是否正常
+        if (checkedTargetId != 0L)
+            ensureParentFolder(owner, checkedTargetId);
+
+        // 获取源文件实体
+        UserFile source = userFileRepository.findByIdAndOwner(checkedSourceId, owner)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到文件"));
 
-        String relativePath;
-        if (targetFolderId != null) {
-            // 目标目录归属校验
-            UserFile targetFolder = userFileRepository.findByIdAndOwner(targetFolderId, owner)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到目标文件夹"));
+        // 同名检查
+        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(source.getFilename(), owner, checkedTargetId))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标文件夹下有同名文件/文件夹");
 
-            // 定义真实磁盘路径
-            relativePath = targetFolder.getFilePath() + "/" + source.getFilename();
-        } else {
-            relativePath = source.getFilename();
-        }
+        // 禁止文件夹移动到子文件夹中，会造成死循环
+        if (source.isFolder() && checkedTargetId != 0L && isDescendantOf(owner, checkedSourceId, checkedTargetId))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "不能移动到子文件夹中");
 
-        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(source.getFilename(), owner, targetFolderId))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标目录下有同名文件/目录");
+        // 旧路径信息
+        String oldLogical = storageService.resolveLogicalPath(checkedSourceId, userId);
+        Path oldDiskPath = storageService.validatePath(userId, oldLogical);
 
-        if (source.isFolder() && targetFolderId != null && isDescendantOf(owner, sourceId, targetFolderId))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "不能移动到子目录中");
+        // 新路径信息
+        String newLogical = checkedTargetId == 0L ? source.getFilename()
+                : storageService.resolveLogicalPath(checkedTargetId, userId) + "/" + source.getFilename();
+        Path newDiskPath = storageService.validatePath(userId, newLogical);
 
-        // 递归更新子文件
-        if (source.isFolder()) {
-            List<UserFile> allChild = new ArrayList<>();
-            fileUtil.collectSubdirectories(owner, sourceId, allChild);
-
-            String oldPath = source.getFilePath();
-
-            for (UserFile child : allChild) {
-                String newPath = relativePath + child.getFilePath().substring(oldPath.length());
-                child.setFilePath(newPath);
-                userFileRepository.save(child);
-            }
-        }
-        String oldPath = source.getFilePath();
         // 更新数据库信息
-        source.setParentFolderId(targetFolderId);
-        source.setFilePath(relativePath);
-        userFileRepository.save(source);
-
         try {
-            // 移动真实文件
-            Files.move(storageService.validatePath(userId, oldPath),
-                    storageService.validatePath(userId, relativePath));
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "移动文件失败");
+            transactionTemplate.executeWithoutResult(status -> {
+                source.setParentFolderId(checkedTargetId);
+                userFileRepository.save(source);
+
+                try {
+                    Files.move(oldDiskPath, newDiskPath, StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    log.warn("[*] moveFile: Failed to move file : " + e.getMessage());
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "移动文件失败");
+                }
+            });
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标文件夹下已有同名文件");
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件移动失败");
         }
+
+        sweepOldPath(oldDiskPath, owner, oldLogical);
 
     }
 
@@ -572,8 +546,8 @@ public class FileService {
     /**
      * 搜索文件
      * 
-     * @param userId  所有者ID
-     * @param keyword 搜索的字符
+     * @param userId  Long - 所有者ID
+     * @param keyword String 搜索的字符
      */
     public List<UserFile> searchFiles(Long userId, String keyword) {
 
@@ -585,10 +559,9 @@ public class FileService {
     /**
      * 批量删除
      * 
-     * @param ids     需要被删除的文件ID
-     * @param userId: 拥有者ID
+     * @param ids    Set<Long> - 需要被删除的文件ID
+     * @param userId Long - 拥有者ID
      */
-    @Transactional
     public void batchDelete(Set<Long> ids, Long userId) {
 
         for (Long fileId : ids) {
@@ -600,10 +573,10 @@ public class FileService {
     /**
      * 检查目标目录是否为被移动目录的子目录
      * 
-     * @param owner          当前用户
-     * @param folderId       被移动目录的id
-     * @param targetFolderId 目标目录的id
-     *                       return 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)，false(不会形成死循环)
+     * @param owner          User - 当前用户
+     * @param folderId       Long - 被移动目录的id
+     * @param targetFolderId Long - 目标目录的id
+     * @param return         boolean - 如果目标目录是被移动目录的子目录则返回 true(会形成死循环)
      **/
     private boolean isDescendantOf(User owner, Long folderId, Long targetFolderId) {
         /**
@@ -612,14 +585,22 @@ public class FileService {
          * 如果遇到了 folder 就说明目标目录是被移动目录的子目录
          */
 
+        Set<Long> visited = new HashSet<>();
+
         Long currentFolder = targetFolderId;
-        while (currentFolder != null) {
+        visited.add(targetFolderId);
+
+        while (currentFolder != 0L && currentFolder != null) {
             if (currentFolder.equals(folderId))
                 return true;
 
             UserFile nextFolder = userFileRepository.findByIdAndOwner(currentFolder, owner).orElse(null);
             if (nextFolder == null)
                 break;
+
+            if (!visited.add(nextFolder.getId()))
+                return true;
+
             currentFolder = nextFolder.getParentFolderId();
         }
 
@@ -656,9 +637,11 @@ public class FileService {
     }
 
     /**
-     * 删除旧路径(remove move 的辅助检查函数)
+     * 删除旧路径(rename move 的辅助检查函数)
      * 
-     * @param oldPath Path - 需要被删除的文件夹ID
+     * @param oldDiskPath Path - 旧文件的磁盘路径
+     * @param owner       User - 文件所有者
+     * @param logicalPath String - 旧文件的逻辑路径
      */
     private void sweepOldPath(Path oldDiskPath, User owner, String logicalPath) {
 
