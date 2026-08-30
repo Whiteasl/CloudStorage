@@ -35,3 +35,6 @@ build/
 *.md
 log
 !./README.md
+/docs/
+src/main/resources/static/assets/index-*
+data/*.db
