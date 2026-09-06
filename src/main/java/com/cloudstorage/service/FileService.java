@@ -107,14 +107,23 @@ public class FileService {
             // 把上传流接入临时文件
             Files.copy(file.getInputStream(), tempPath);
 
+            // 对临时文件进行移动
+            Files.move(tempPath, diskPath, StandardCopyOption.ATOMIC_MOVE);
+
+        } catch (FileAlreadyExistsException e) {
+            // 上传失败
+            // 删除临时文件并抛出 409 错误
             try {
-                // 对临时文件进行原子改名
-                Files.move(tempPath, diskPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException e) {
-                // 文件系统不支持原子改名时抛出错误
-                // 修改为：普通改名操作
-                Files.move(tempPath, diskPath, StandardCopyOption.REPLACE_EXISTING);
+                Files.deleteIfExists(tempPath);
+            } catch (IOException ignored) {
+                // 清理失败，遗留文件不再管理，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+
             }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "文件夹下已有同名文件");
+
         } catch (IOException e) {
             // 上传失败
             // 删除临时文件并抛出 500 错误

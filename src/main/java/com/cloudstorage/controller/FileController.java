@@ -94,7 +94,8 @@ public class FileController {
      * 
      */
     @GetMapping("/file/download")
-    public ResponseEntity<FileSystemResource> downloadFile(@RequestParam("fileId") Long fileId) {
+    public ResponseEntity<FileSystemResource> downloadFile(
+            @RequestParam(value = "fileId", required = true) Long fileId) {
         Long userId = this.getCurrentUserId();
         FileSystemResource resource = fileService.downloadFile(fileId, userId);
         return ResponseEntity.ok()
@@ -232,7 +233,7 @@ public class FileController {
     @PostMapping("/file/compress")
     public ResponseEntity<Void> compressFiles(@RequestBody CompressRequest request) {
 
-        if (request.getArchiveName() == null) {
+        if (request.getArchiveName() == null || request.getArchiveName().equals("")) {
             // 压缩文件名为空，使用时间戳进行命名
             request.setArchiveName(String.valueOf(System.currentTimeMillis()));
         }

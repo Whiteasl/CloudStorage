@@ -2,5 +2,5 @@
 
 export interface CreateFolderRequest {
   folderName: string;
-  parentFolderId: number;
+  parentFolderId: number | null;
 }

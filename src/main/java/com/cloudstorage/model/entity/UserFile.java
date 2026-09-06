@@ -19,18 +19,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "files")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "files", uniqueConstraints = { @UniqueConstraint(name = "uk_files_owner_parent_name", columnNames = {
+        "owner_id", "parent_folder_id", "filename" }) })
 
 public class UserFile {
     @Id
@@ -55,7 +57,7 @@ public class UserFile {
     private Long parentFolderId = 0L; // 子目录所属的父级目录， null 为根目录，其他值=所属文件夹 ID
 
     @ManyToOne
-    @JoinColumn(name = "owner_id")
+    @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
     @CreatedDate
