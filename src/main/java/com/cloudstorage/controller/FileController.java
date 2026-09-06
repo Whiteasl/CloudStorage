@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudstorage.model.dto.Request.BatchDeleteRequest;
+import com.cloudstorage.model.dto.Request.CompressRequest;
 import com.cloudstorage.model.dto.Request.CreateFolderRequest;
 import com.cloudstorage.model.dto.Response.FileResponse;
 import com.cloudstorage.model.entity.UserFile;
 import com.cloudstorage.service.FileService;
-import com.cloudstorage.util.FileUtils;
 
 import jakarta.validation.Valid;
 
@@ -37,11 +37,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 @RestController
 public class FileController {
     private final FileService fileService;
-    private final FileUtils fileUtils;
 
-    public FileController(FileService fileService, FileUtils fileUtils) {
+    public FileController(FileService fileService) {
         this.fileService = fileService;
-        this.fileUtils = fileUtils;
     }
 
     private Long getCurrentUserId() {
@@ -218,10 +216,10 @@ public class FileController {
      * @return 成功 返回状态码
      */
     @PostMapping("/file/batch-delete")
-    public ResponseEntity<Void> batchDelete(@Valid @RequestBody BatchDeleteRequest request) {
-        fileService.batchDelete(request.getIds(), getCurrentUserId());
+    public ResponseEntity<List<Long>> batchDelete(@Valid @RequestBody BatchDeleteRequest request) {
+        List<Long> failedDelete = fileService.batchDelete(request.getIds(), getCurrentUserId());
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(failedDelete);
     }
 
     /**
@@ -232,18 +230,17 @@ public class FileController {
      * @return 成功 返回一个下载链接
      */
     @PostMapping("/file/compress")
-    public ResponseEntity<FileSystemResource> compressFiles(@RequestParam("fileIds") Set<Long> fileIds,
-            @RequestParam(required = false, value = "archiveName") String archiveName) {
+    public ResponseEntity<Void> compressFiles(@RequestBody CompressRequest request) {
 
-        if (archiveName == null) {
-            archiveName = String.valueOf(System.currentTimeMillis());
+        if (request.getArchiveName() == null) {
+            // 压缩文件名为空，使用时间戳进行命名
+            request.setArchiveName(String.valueOf(System.currentTimeMillis()));
         }
-        FileSystemResource resource = fileUtils.compressFiles(fileIds, this.getCurrentUserId(), archiveName);
 
-        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + archiveName + ".zip\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
+        List<Long> ids = new ArrayList<>(request.getIds());
+        fileService.compressToFile(ids, this.getCurrentUserId(), request.getArchiveName(), request.getFolderId());
+
+        return ResponseEntity.ok().build();
     }
 
 }

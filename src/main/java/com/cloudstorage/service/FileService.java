@@ -42,7 +42,6 @@ public class FileService {
     private final UserFileRepository userFileRepository;
     private final UserRepository userRepository;
     private final FileUtils fileUtil;
-    private final PlatformTransactionManager platformTransactionManager;
     private final ShareLinkRepository shareLinkRepository;
     private final FileAnomalyRepository fileAnomalyRepository;
     private final static Logger log = LoggerFactory.getLogger(FileService.class);
@@ -57,7 +56,6 @@ public class FileService {
         this.userFileRepository = userFileRepository;
         this.userRepository = userRepository;
         this.fileUtil = fileUtil;
-        this.platformTransactionManager = platformTransactionManager;
         this.shareLinkRepository = shareLinkRepository;
         this.fileAnomalyRepository = fileAnomalyRepository;
         this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
@@ -557,17 +555,183 @@ public class FileService {
     }
 
     /**
-     * 批量删除
+     * 批量删除，返回一个记录未能删除的列表
      * 
      * @param ids    Set<Long> - 需要被删除的文件ID
      * @param userId Long - 拥有者ID
+     * @return List<Long> - 返回删除错误的列表
      */
-    public void batchDelete(Set<Long> ids, Long userId) {
+    public List<Long> batchDelete(Set<Long> ids, Long userId) {
 
+        if (ids.isEmpty())
+            return null;
+
+        List<Long> count = new ArrayList<>();
         for (Long fileId : ids) {
-            this.deleteFile(fileId, userId);
+            try {
+                this.deleteFile(fileId, userId);
+            } catch (RuntimeException e) {
+                count.add(fileId);
+            }
         }
 
+        // 返回错误ID列表
+        return count;
+
+    }
+
+    public void compressToFile(List<Long> fileIds, Long userId, String archiveName, Long folderId) {
+
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户错误"));
+
+        // 格式化文件ID 校验文件ID
+        Long checkedFolderId = normalizeParentId(folderId);
+        if (checkedFolderId != 0)
+            ensureParentFolder(owner, checkedFolderId);
+
+        // 压缩文件
+        List<UserFile> userFiles = userFileRepository.findAllByIdInAndOwner(fileIds, owner);
+
+        // 文件数量检查
+        if (userFiles.size() != Set.copyOf(fileIds).size())
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "有一个或多个文件未找到");
+
+        // 重名检查
+        if (userFileRepository.existsByFilenameAndOwnerAndParentFolderId(archiveName + ".zip", owner,
+                checkedFolderId))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件夹下已有同名文件");
+
+        // 第一层配额检查
+        // 压缩前
+        if (owner.getStorageUsed() >= owner.getStorageQuota()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "配额已满，请清理文件");
+
+        }
+
+        // 路径操作
+        String logical = (checkedFolderId == 0L) ? archiveName + ".zip"
+                : storageService.resolveLogicalPath(checkedFolderId, userId)
+                        + "/" + archiveName + ".zip";
+        Path diskPath = storageService.validatePath(userId, logical);
+
+        // 压缩用的临时路径
+        Path temp = storageService.validatePath(userId,
+                (checkedFolderId == 0L) ? "tmp---" + UUID.randomUUID().toString() + ".tmp"
+                        : storageService.resolveLogicalPath(checkedFolderId, userId)
+                                + "/" + "tmp---" + UUID.randomUUID().toString() + ".tmp");
+
+        temp = fileUtil.compressFiles(userFiles, userId, temp);
+
+        // 磁盘操作
+        // 第二层配额检查
+        // 压缩后
+        Long size = this.getFileSize(temp);
+
+        if (size == null) {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException e) {
+                log.warn("[*] The file size calculation is incorrect, and the deletion of the incorrect file failed: "
+                        + e.getMessage());
+            }
+
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "压缩失败");
+        }
+
+        if (size > owner.getStorageQuota() - owner.getStorageUsed()) {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException ignored) {
+                log.warn("[*] compressToFile: When the quota check fails, temporary files cannot be deleted: "
+                        + ignored.getMessage());
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "配额不足，请清理文件后重试");
+        }
+        try {
+            // 把压缩文件移动到对应磁盘下
+            Files.move(temp, diskPath, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            // 文件系统不支持原子改名时抛出错误
+            // 修改为：普通改名操作
+            try {
+                Files.move(temp, diskPath, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException ioException) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    log.warn("[*] compressToFile: Failed to move: " + ignored.getMessage());
+                }
+
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "压缩失败");
+            }
+        } catch (IOException e) {
+            // 上传失败
+            // 删除临时文件并抛出 500 错误
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException ignored) {
+                // 清理失败，遗留文件不再管理，避免出现递归错误
+                // 交由开机检查或是下次上传直接覆盖
+
+                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+
+            }
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件上传失败");
+        }
+
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                UserFile uf = new UserFile();
+
+                uf.setFilename(archiveName + ".zip");
+                uf.setParentFolderId(checkedFolderId);
+                uf.setOwner(owner);
+                uf.setFileSize(size);
+                uf.setContentType("application/zip");
+
+                owner.setStorageUsed(owner.getStorageUsed() + size);
+
+                userFileRepository.save(uf);
+                userRepository.save(owner);
+            });
+        } catch (DataIntegrityViolationException e) {
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException ignored) {
+                log.warn("[*] compressToFile: A file with the same name already exists in the folder: "
+                        + ignored.getMessage());
+            }
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件夹下已有同名文件");
+        } catch (RuntimeException e) {
+            try {
+                Files.deleteIfExists(diskPath);
+            } catch (IOException ignored) {
+                log.warn("[*] compressToFile: A file with the same name already exists in the folder: "
+                        + ignored.getMessage());
+            }
+
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "压缩失败");
+        }
+
+    }
+
+    /**
+     * 获取某个文件的大小，获取失败时返回 null
+     * 
+     * @param diskPath Path - 文件地址
+     * @return Long - 成功时返回文件大小，失败时返回 null
+     */
+    private Long getFileSize(Path diskPath) {
+        Long size;
+        try {
+            size = Files.size(diskPath);
+        } catch (IOException e) {
+            size = null;
+        }
+
+        return size;
     }
 
     /**
@@ -583,25 +747,24 @@ public class FileService {
          * 检查目标目录是否为被移动目录的子目录
          * 从 targetFolder 往上追溯 parentFolder 链
          * 如果遇到了 folder 就说明目标目录是被移动目录的子目录
+         * 使用 集合Set 进行判断是否闭环
          */
 
         Set<Long> visited = new HashSet<>();
 
-        Long currentFolder = targetFolderId;
-        visited.add(targetFolderId);
+        Long currentFolderId = targetFolderId;
+        visited.add(folderId);
 
-        while (currentFolder != 0L && currentFolder != null) {
-            if (currentFolder.equals(folderId))
+        while (currentFolderId != 0L && currentFolderId != null) {
+
+            if (!visited.add(currentFolderId))
                 return true;
 
-            UserFile nextFolder = userFileRepository.findByIdAndOwner(currentFolder, owner).orElse(null);
+            UserFile nextFolder = userFileRepository.findByIdAndOwner(currentFolderId, owner).orElse(null);
             if (nextFolder == null)
                 break;
 
-            if (!visited.add(nextFolder.getId()))
-                return true;
-
-            currentFolder = nextFolder.getParentFolderId();
+            currentFolderId = nextFolder.getParentFolderId();
         }
 
         return false;
