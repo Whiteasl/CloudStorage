@@ -84,6 +84,10 @@ public class DataInitializer implements CommandLineRunner {
         System.out.println("[DataInitializer] 密码：" + password);
     }
 
+    /**
+     * 迁移表结构
+     * 历史升级的一次性残留清洗，现在每次启动幂等空转
+     */
     private void migrateFileTable() {
         int updated = jdbcTemplate.update("UPDATE files SET parent_folder_id = 0 WHERE parent_folder_id IS NULL");
 
@@ -180,9 +184,6 @@ public class DataInitializer implements CommandLineRunner {
 
         // 索引校验
         try {
-            if (!this.indexExists("files", "uq_files_owner_parent_name"))
-                jdbcTemplate.execute(
-                        "CREATE UNIQUE INDEX uq_files_owner_parent_name ON files(owner_id, parent_folder_id, filename)");
 
             if (!this.indexExists("files", "idx_files_parent_folder"))
                 jdbcTemplate.execute("CREATE INDEX idx_files_parent_folder ON files(parent_folder_id)");
@@ -197,23 +198,49 @@ public class DataInitializer implements CommandLineRunner {
             if (this.columnExists("files", "file_path"))
                 jdbcTemplate.execute("ALTER TABLE files DROP COLUMN file_path");
         } catch (SQLException e) {
-            log.error("[!] columnsExists: Failed to connect database: " + e.getMessage());
+            log.error("[!] columnsExists: Failed to check column existence: " + e.getMessage());
         } catch (DataAccessException e) {
             log.error("[!] migrateFileTable: Failed to execute SQL statement: " + e.getMessage());
         }
     }
 
+    /**
+     * FileRow
+     * 内部 record 类
+     * 迁移去重时读取的文件行快照
+     * 
+     * @param id       Long - 异常ID
+     * @param ownerId  Long - 导致本次异常的用户
+     * @param parentId Long - 导致本次异常的文件的父目录ID
+     * @param filename String - 导致本次异常的文件名
+     */
     private record FileRow(Long id, Long ownerId, Long parentId, String filename) {
     }
 
+    /**
+     * 拼查重键，三段用 | 分隔，对应文件唯一性的三个条件：归属人+所在目录+文件名
+     * 
+     * @param fr FileRow - 内部类，迁移去重时读取的文件行快照
+     * @return String - 返回异常的唯一Key
+     */
     private String buildKey(FileRow fr) {
         return fr.ownerId() + "|" + fr.parentId() + "|" + fr.filename();
     }
 
+    /**
+     * 索引存在性查询
+     * 
+     * @param table     String - 表名
+     * @param indexName String - 索引名
+     * @return boolean - 如果存在则返回 true, 否则返回 false
+     * @throws SQLException 元数据查询失败时抛出
+     */
     private boolean indexExists(String table, String indexName) throws SQLException {
-        // 获取表数据
+        // 获取索引元数据
         try (Connection connection = dataSource.getConnection();
-                ResultSet rs = connection.getMetaData().getIndexInfo(null, null, "%", false, false);) {
+                // null catalog + % 在 mariaDB 中返回空结果集，导致每次启动都误判索引不存在
+                ResultSet rs = connection.getMetaData().getIndexInfo(connection.getCatalog(), null, table, false,
+                        false);) {
 
             // 对返回值进行比对
             while (rs.next()) {
@@ -228,19 +255,21 @@ public class DataInitializer implements CommandLineRunner {
 
     }
 
-    private boolean columnExists(String table, String indexName) throws SQLException {
-        // 获取表数据
+    /**
+     * 判断列是否存在
+     * 
+     * @param table      String - 查询的表名
+     * @param columnName String - 查询的列名
+     * @return boolean - 如果有结果则返回 true ,否则返回 false
+     * @throws SQLException 元数据查询失败时抛出
+     */
+    private boolean columnExists(String table, String columnName) throws SQLException {
+        // 获取列的元数据
         try (Connection connection = dataSource.getConnection();
-                ResultSet rs = connection.getMetaData().getColumns(null, null, "%", "%");) {
+                ResultSet rs = connection.getMetaData().getColumns(connection.getCatalog(), null, table, columnName);) {
 
-            // 对返回值进行比对
-            while (rs.next()) {
-                if (table.equalsIgnoreCase(rs.getString("TABLE_NAME"))
-                        && indexName.equalsIgnoreCase(rs.getString("INDEX_NAME")))
-                    return true;
-            }
-
-            return false;
+            // ResultSet 游标悬停在第一行前，next() 移动到第一行并报告是否有结果，精确查询只会返回一行结果
+            return rs.next();
         }
     }
 }
