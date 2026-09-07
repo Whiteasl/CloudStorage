@@ -24,4 +24,9 @@ public interface ShareLinkRepository extends JpaRepository<ShareLink, Long> {
     List<ShareLink> findByExpireTimeBefore(LocalDateTime time); // 查找所有过期的分享文件 - 统一销毁
 
     Optional<ShareLink> findByShareFileAndOwner(UserFile shareFile, User owner); // 根据 文件ID 和 所有者实体 查找 校验码
+
+    void deleteByShareFileIn(List<UserFile> shareFiles); // 级联删除时防止分享链接卡住删除操作
+
+    void deleteByShareFile(UserFile shareFile); // 根据文件实体删除分享链接
+
 }

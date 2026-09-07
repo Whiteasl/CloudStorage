@@ -1,5 +1,5 @@
 // 前后端通信层
-const BASE_URL: string = import.meta.env.PROD ? "" : "/api";
+export const BASE_URL: string = import.meta.env.PROD ? "" : "/api";
 
 function getToken(): string | null {
   let token: string | null;
@@ -26,16 +26,20 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     },
   });
 
+  // 未登录处理
   if (response.status === 401) {
     localStorage.removeItem("token");
     window.location.href = "/login";
     throw new Error("未登录");
   }
 
+  // 后端返回失败信息
   if (!response.ok)
     throw new ApiError(`HTTP ${response.status}`, response.status);
 
   const text = await response.text();
+
+  // 如果 text 非空则进行 json 编码返回，否则返回 undefined
   return text ? JSON.parse(text) : (undefined as T);
 }
 

@@ -1,15 +1,20 @@
 package com.cloudstorage.util;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.springframework.core.io.FileSystemResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,6 +34,7 @@ public class FileUtils {
     private final UserFileRepository userFileRepository;
     private final UserRepository userRepository;
     private final StorageService storageService;
+    private static final Logger log = LoggerFactory.getLogger(FileUtils.class);
 
     public FileUtils(UserFileRepository userFileRepository, UserRepository userRepository,
             StorageService storageService) {
@@ -40,29 +46,27 @@ public class FileUtils {
     /**
      * 压缩文件
      * 
-     * @param fileIds     文件ID集合
-     * @param userId      所有者ID
-     * @param archiveName 压缩文件名字
-     * @return 成功则返回一个 FileSystemResource 对象
+     * @param userFiles List<UserFile> - 文件ID集合
+     * @param userId    Long - 所有者ID
+     * @param temp      Path - 压缩用的临时文件
+     * @return Path - 返回压缩文件路径
      */
-    public FileSystemResource compressFiles(Set<Long> fileIds, Long userId, String archiveName) {
+    public Path compressFiles(List<UserFile> userFiles, Long userId, Path temp) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "账户异常：未找到账户"));
-        List<UserFile> userFiles = getFilesByIds(fileIds, owner);
 
-        Path tempZip;
-        try {
-            tempZip = Files.createTempFile(archiveName, ".zip");
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "临时文件创建错误，请联系管理员处理");
-        }
+        // 开始对文件进行压缩，生成压缩包
+        try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(temp))) {
 
-        try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(tempZip))) {
-
+            // 一个存储已添加到 Zip 的文件的文件ID，避免同一个文件重复添加
+            Set<Long> putNextEntry = new HashSet<>();
             for (UserFile uf : userFiles) {
+
                 // 压缩目录
                 if (uf.isFolder()) {
-                    ZipEntry dirEntry = new ZipEntry(uf.getFilePath() + "/");
+                    // 获取文件夹逻辑路径
+                    ZipEntry dirEntry = new ZipEntry(
+                            storageService.resolveLogicalPath(uf.getId(), userId) + "/");
                     zos.putNextEntry(dirEntry);
                     zos.closeEntry();
 
@@ -72,10 +76,19 @@ public class FileUtils {
                     collectSubdirectories(owner, uf.getId(), children);
 
                     for (UserFile child : children) {
+
                         if (!child.isFolder()) {
 
-                            Path diskPath = storageService.validatePath(userId, child.getFilePath());
-                            ZipEntry entry = new ZipEntry(child.getFilePath());
+                            // 集合 避免同一个文件压缩多次
+                            if (!putNextEntry.add(child.getId()))
+                                continue;
+
+                            // 子文件是文件时
+                            // 获取文件的磁盘路径
+                            String logical = storageService.resolveLogicalPath(child.getId(), userId);
+                            Path diskPath = storageService.validatePath(userId, logical);
+                            // 添加到压缩文件中
+                            ZipEntry entry = new ZipEntry(logical);
                             zos.putNextEntry(entry);
                             Files.copy(diskPath, zos);
                             zos.closeEntry();
@@ -83,10 +96,13 @@ public class FileUtils {
                     }
 
                 } else {
-                    // 压缩文件
 
-                    Path diskPath = storageService.validatePath(userId, uf.getFilePath());
-                    ZipEntry entry = new ZipEntry(uf.getFilePath());
+                    if (!putNextEntry.add(uf.getId()))
+                        continue;
+                    // 压缩对象是文件时
+
+                    Path diskPath = storageService.resolveRealPath(uf.getId(), userId);
+                    ZipEntry entry = new ZipEntry(storageService.resolveLogicalPath(uf.getId(), userId));
                     zos.putNextEntry(entry);
                     Files.copy(diskPath, zos);
                     zos.closeEntry();
@@ -94,48 +110,100 @@ public class FileUtils {
             }
 
         } catch (IOException e) {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException ignored) {
+                log.warn("[*] compressFiles: The temporary files generated by compression cannot be deleted: "
+                        + ignored.getMessage());
+            }
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "压缩失败");
         }
 
-        return new FileSystemResource(tempZip);
+        return temp;
     }
 
-    /**
-     * 从文件ID获取文件实体
-     * 
-     * @param fileIds 文件ID集合
-     * @param owner   文件拥有者
-     * @return 成功则返回一个存储 UserFile 实体的列表
-     */
-    private List<UserFile> getFilesByIds(Set<Long> fileIds, User owner) {
+    // /**
+    // * 从文件ID获取文件实体
+    // *
+    // * @param fileIds 文件ID集合
+    // * @param owner 文件拥有者
+    // * @return 成功则返回一个存储 UserFile 实体的列表
+    // */
+    // private List<UserFile> getFilesByIds(Set<Long> fileIds, User owner) {
 
-        List<UserFile> userFiles = new ArrayList<>();
+    // List<UserFile> userFiles = new ArrayList<>();
 
-        for (Long id : fileIds) {
+    // for (Long id : fileIds) {
 
-            userFiles.add(userFileRepository.findByIdAndOwner(id, owner)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文件异常：有一个或多个文件未找到")));
-        }
+    // userFiles.add(userFileRepository.findByIdAndOwner(id, owner)
+    // .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+    // "文件异常：有一个或多个文件未找到")));
+    // }
 
-        return userFiles;
-    }
+    // return userFiles;
+    // }
 
     /**
      * 通过递归获取目录下的所有子文件/目录
      * 
-     * @param owner    目录拥有者
-     * @param folderId 目录ID
-     * @param allFiles 传入的列表
+     * @param owner    User - 目录拥有者
+     * @param folderId Long - 目录ID
+     * @param files    List<UserFile> - 收集文件的列表
      */
-    public void collectSubdirectories(User owner, Long folderId, List<UserFile> allFiles) {
+    public void collectSubdirectories(User owner, Long folderId, List<UserFile> files) {
 
         List<UserFile> children = userFileRepository.findByOwnerAndParentFolderId(owner, folderId);
         for (UserFile child : children) {
-            allFiles.add(child);
+            files.add(child);
             if (child.isFolder()) {
-                collectSubdirectories(owner, child.getId(), allFiles);
+                collectSubdirectories(owner, child.getId(), files);
             }
         }
 
     }
+
+    /**
+     * 递归删除
+     * 
+     * @param folderId Path - 需要被删除的文件夹
+     * @return boolean - 删除失败时返回 false
+     * @throws IOException - Files.delete 的异常处理
+     */
+    public void deleteRecursively(Path delDir) throws IOException {
+
+        if (Files.exists(delDir)) {
+            Files.walkFileTree(delDir, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+
+    }
+
+    // /**
+    // * 辅助方法，用于检测文件夹是否为空文件夹
+    // *
+    // * @param checkDir Path - 待检测文件夹
+    // * @return boolean - 空文件夹返回true
+    // * @throws IOException 文件不存在，抛出 IOException，交给上层处理
+    // */
+    // private boolean isEmptyDir(Path checkDir) throws IOException {
+    // if (Files.exists(checkDir)) {
+    // try (DirectoryStream<Path> stream = Files.newDirectoryStream(checkDir)) {
+    // return !stream.iterator().hasNext();
+    // }
+    // } else {
+    // throw new IOException();
+    // }
+
+    // }
 }

@@ -18,7 +18,6 @@ public class FileResponse {
      * 
      * @Param id
      * @Param filename
-     * @Param filePath
      * @Param fileSize
      * @Param contentType
      * @Param isFolder
@@ -29,7 +28,6 @@ public class FileResponse {
 
     private Long id;
     private String filename;
-    private String filePath;
     private long fileSize;
     private String contentType;
     @JsonProperty("isFolder")
