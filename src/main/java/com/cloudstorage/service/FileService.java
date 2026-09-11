@@ -675,7 +675,6 @@ public class FileService {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "压缩失败");
             }
         } catch (IOException e) {
-            // 上传失败
             // 删除临时文件并抛出 500 错误
             try {
                 Files.deleteIfExists(temp);
@@ -683,13 +682,17 @@ public class FileService {
                 // 清理失败，遗留文件不再管理，避免出现递归错误
                 // 交由开机检查或是下次上传直接覆盖
 
-                log.warn("[*] Upload: Failed to clear up residual file: " + ignored.getMessage());
+                log.warn("[*] compressToFile: Failed to clear up residual file: " + ignored.getMessage());
 
             }
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "文件上传失败");
         }
 
         try {
+
+            // 删除执行权限
+            storageService.removeExecutePermission(diskPath);
+
             transactionTemplate.executeWithoutResult(status -> {
                 UserFile uf = new UserFile();
 
