@@ -31,6 +31,7 @@ public class JwtTokenUtil {
 
     private static Logger log = LoggerFactory.getLogger(JwtTokenUtil.class);
 
+    // 使用时需要乘 3600, Token 记录时间为 2H
     @Value("${cloudstorage.jwt.expiration-hours}")
     private long expirationHours;
 
@@ -106,5 +107,15 @@ public class JwtTokenUtil {
     public Long getUserIdFromToken(String token) {
         Claims claims = validateToken(token);
         return claims.get("id", Long.class);
+    }
+
+    /**
+     * 把私有的 expirationSecond 转化成秒提供给Cookie构造使用
+     * 让 Cookie 的 Max-Age 与 JWT 过期时间同步
+     * 
+     * @return long - 返回JWT过期时间，默认是 2H
+     */
+    public long getExpirationSecond() {
+        return this.expirationHours * 3600;
     }
 }
