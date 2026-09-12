@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.cloudstorage.security.AuthCookieService;
 import com.cloudstorage.security.JwtAuthenticationFilter;
 import com.cloudstorage.util.JwtTokenUtil;
 
@@ -25,9 +26,11 @@ import com.cloudstorage.util.JwtTokenUtil;
 @EnableMethodSecurity // 方法级别的安全控制 先加上，后续可能有用 对同一个 URL 的不同HTTP方法选用不同的权限 开启 PreAuthorize 注解功能
 public class SecurityConfig {
     private final JwtTokenUtil jwtTokenUtil;
+    private final AuthCookieService authCookieService;
 
-    public SecurityConfig(JwtTokenUtil jwtTokenUtil) {
+    public SecurityConfig(JwtTokenUtil jwtTokenUtil, AuthCookieService authCookieService) {
         this.jwtTokenUtil = jwtTokenUtil;
+        this.authCookieService = authCookieService;
     }
 
     /**
@@ -58,11 +61,13 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/login", "/register", "/Share/**").permitAll()
                         .requestMatchers("/share/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/logout").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/reset-password/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN") // 管理员页面需要验证用户为管理员才能访问
                         .requestMatchers("/file/**").hasAnyRole("USER", "ADMIN") // 文件存储页面需要验证用户登录状态，只有登录的用户才能访问
                         .anyRequest().authenticated()) // 其余所有页面都需要登录才能访问，不限制访问路径
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenUtil), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenUtil, authCookieService.getCookieName()),
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

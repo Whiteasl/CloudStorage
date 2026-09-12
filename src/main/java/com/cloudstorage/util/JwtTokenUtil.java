@@ -32,11 +32,12 @@ public class JwtTokenUtil {
     private static Logger log = LoggerFactory.getLogger(JwtTokenUtil.class);
 
     // 使用时需要乘 3600, Token 记录时间为 2H
-    @Value("${cloudstorage.jwt.expiration-hours}")
-    private long expirationHours;
+    private final int expirationHours;
 
-    public JwtTokenUtil(@Value("${cloudstorage.jwt.secret}") String secret) {
+    public JwtTokenUtil(@Value("${cloudstorage.jwt.secret}") String secret,
+            @Value("${cloudstorage.jwt.expiration-hours}") int expirationHours) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        this.expirationHours = expirationHours;
     }
 
     /**
@@ -53,6 +54,7 @@ public class JwtTokenUtil {
                 .claim("id", user.getId())
                 .claim("username", user.getUsername())
                 .claim("role", user.getRole())
+                .claim("type", "auth")
                 .signWith(key) // 使用密钥进行签名
                 .compact(); // 压缩并生成最终的令牌字符串
     }
@@ -69,6 +71,7 @@ public class JwtTokenUtil {
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 20 * 60 * 1000))
                 .claim("email", email)
+                .claim("type", "recover")
                 .signWith(key)
                 .compact();
     }
@@ -98,6 +101,16 @@ public class JwtTokenUtil {
         }
     }
 
+    public Claims validateAuthToken(String token) {
+        Claims claims = this.validateToken(token);
+
+        if (!"auth".equals(claims.get("type", String.class)) || claims.get("id", Long.class) == null
+                || claims.get("role", String.class) == null)
+            throw new InvalidTokenException("令牌用途不符或声明缺失");
+
+        return claims;
+    }
+
     /**
      * 从令牌中提取 id
      * 
@@ -118,4 +131,5 @@ public class JwtTokenUtil {
     public long getExpirationSecond() {
         return this.expirationHours * 3600;
     }
+
 }

@@ -24,6 +24,7 @@ import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.SecurityQuestionRepository;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.util.JwtTokenUtil;
+import com.cloudstorage.util.RandomChar;
 
 @Service
 public class PasswordResetService {
@@ -207,7 +208,7 @@ public class PasswordResetService {
     }
 
     private String generateTokenAndSaved(User user) {
-        String token = jwtTokenUtil.generateToken(user);
+        String token = RandomChar.generateUUID();
 
         redis.opsForValue().set("reset:token:" + token, String.valueOf(user.getId()),
                 Duration.ofMinutes(resetPasswordExpirationTime));

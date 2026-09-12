@@ -2,7 +2,6 @@ package com.cloudstorage.security;
 
 import java.time.Duration;
 
-import org.apache.catalina.connector.Response;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -32,7 +31,7 @@ public class AuthCookieService {
      */
     public ResponseCookie issue(User user) {
 
-        return ResponseCookie.from(this.cookieName, jwtTokenUtil.generateForgotPasswordToken(cookieName))
+        return ResponseCookie.from(this.cookieName, jwtTokenUtil.generateToken(user))
                 .maxAge(Duration.ofSeconds(jwtTokenUtil.getExpirationSecond())).secure(this.cookieSecurity)
                 .httpOnly(true).sameSite("Strict").path("/").build();
     }
