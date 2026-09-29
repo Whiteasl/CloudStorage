@@ -1,5 +1,7 @@
 package com.cloudstorage.config;
 
+import java.io.IOException;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,6 +20,8 @@ import com.cloudstorage.security.AuthCookieService;
 import com.cloudstorage.security.JwtAuthenticationFilter;
 import com.cloudstorage.util.JwtTokenUtil;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 /**
  * SecurityConfig
  */
@@ -31,6 +35,7 @@ public class SecurityConfig {
     public SecurityConfig(JwtTokenUtil jwtTokenUtil, AuthCookieService authCookieService) {
         this.jwtTokenUtil = jwtTokenUtil;
         this.authCookieService = authCookieService;
+
     }
 
     /**
@@ -58,14 +63,23 @@ public class SecurityConfig {
                         .permitAll() // 前端资源允许所有人访问，防止出现页面无法加载或格式错误异常出现
 
                         // API 端点
+                        .requestMatchers("/logout").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/login", "/register", "/Share/**").permitAll()
                         .requestMatchers("/share/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/logout").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/reset-password/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN") // 管理员页面需要验证用户为管理员才能访问
                         .requestMatchers("/file/**").hasAnyRole("USER", "ADMIN") // 文件存储页面需要验证用户登录状态，只有登录的用户才能访问
                         .anyRequest().authenticated()) // 其余所有页面都需要登录才能访问，不限制访问路径
+                .exceptionHandling((ex) -> {
+                    ex.authenticationEntryPoint((request, response, authException) -> {
+                        errorWriter(response, HttpServletResponse.SC_UNAUTHORIZED, "无有效凭证");
+                    })
+                            .accessDeniedHandler((request, response, accessDeniedException) -> {
+                                errorWriter(response, HttpServletResponse.SC_FORBIDDEN, "权限不足");
+                            });
+                }) // 错误状态码对齐 未认证->401 越权 -> 403
+                .logout((logout) -> logout.disable()) // 禁用SpringBoot自带的登出Filter，项目中已经实现了登出功能
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenUtil, authCookieService.getCookieName()),
                         UsernamePasswordAuthenticationFilter.class);
 
@@ -98,6 +112,22 @@ public class SecurityConfig {
         // SpringBoot 会自动整合 UserDetailsService 和 PasswordEncoder 到 Ioc 容器中
         // 后续组装 Bean 时能直接用
         return config.getAuthenticationManager();
+
+    }
+
+    /**
+     * 把错误信息以 json 形式返回
+     * 
+     * @param response 响应体
+     * @param status   状态码
+     * @param message  错误信息
+     * @exception IOException
+     */
+    private static void errorWriter(HttpServletResponse response, int status, String message) throws IOException {
+
+        response.setStatus(status);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"error\": \"" + message + "\"}");
 
     }
 }

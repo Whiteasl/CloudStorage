@@ -2,6 +2,8 @@ package com.cloudstorage.controller;
 
 import com.cloudstorage.security.AuthCookieService;
 
+import java.net.URI;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -83,9 +85,10 @@ public class AuthController {
      * 
      * @return
      */
-    @PostMapping("/logout")
+    @GetMapping("/logout")
     public ResponseEntity<Void> logout() {
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, authCookieService.expire().toString()).build();
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create("/login"))
+                .header(HttpHeaders.SET_COOKIE, authCookieService.expire().toString()).build();
     }
 
 }
