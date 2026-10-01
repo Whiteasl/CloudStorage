@@ -14,6 +14,7 @@ export async function probeSession(): Promise<void> {
 
     authStore.setUser(response);
   } catch {
+    // 出现任何错误都直接清空登录态
     authStore.clear();
   }
 }

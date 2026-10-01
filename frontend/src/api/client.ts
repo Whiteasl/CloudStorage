@@ -1,11 +1,7 @@
+import { authStore } from "../auth/authStore";
+
 // 前后端通信层
 export const BASE_URL: string = import.meta.env.PROD ? "" : "/api";
-
-function getToken(): string | null {
-  let token: string | null;
-  token = localStorage.getItem("token");
-  return token;
-}
 
 export class ApiError extends Error {
   status: number;
@@ -16,21 +12,18 @@ export class ApiError extends Error {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token: string | null = getToken();
-
   const response = await fetch(BASE_URL + url, {
     ...options,
     headers: {
       ...options?.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 
   // 未登录处理
   if (response.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-    throw new Error("未登录");
+    authStore.clear();
+
+    throw new ApiError("未登录", response.status);
   }
 
   // 后端返回失败信息
