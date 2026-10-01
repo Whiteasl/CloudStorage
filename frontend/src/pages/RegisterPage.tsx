@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { post } from "../api/client";
+import { ApiError, post } from "../api/client";
 import type { AuthResponse } from "../types/dto/response/AuthResponse";
+import { probeSession } from "../auth/session";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -17,16 +18,26 @@ export default function RegisterPage() {
     password: string,
     email: string,
   ): Promise<void> {
+    setError("");
+
     try {
-      const data = await post<AuthResponse>("/register", {
+      await post<AuthResponse>("/register", {
         username,
         password,
         email,
       });
-      localStorage.setItem("token", data.token);
+
+      await probeSession();
+
       navigate("/files");
-    } catch (error) {
-      console.error("错误：" + error);
+    } catch (e) {
+      console.error("错误：" + e);
+
+      if (e instanceof ApiError && e.status === 409) {
+        setError("邮箱或用户名已被注册，请检查后重试");
+      } else {
+        setError("注册失败，请重试");
+      }
     }
   }
 
@@ -43,7 +54,6 @@ export default function RegisterPage() {
           RegisterSubmit(username, password, email);
         }}
       >
-        {error && <p className="error-state">{error}</p>}
         <label>
           账号
           <input
@@ -87,6 +97,9 @@ export default function RegisterPage() {
             required
           ></input>
         </label>
+
+        {error && <p className="error-state">{error}</p>}
+
         <button type="submit">注册</button>
         <Link to="/login" className="auth-link">
           去登录
