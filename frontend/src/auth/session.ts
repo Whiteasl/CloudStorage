@@ -1,8 +1,9 @@
-import type { CurrentUserResponse } from "./../types/dto/response/CurrentUserResponse";
 /**
  * 访问 /me 端点对登录态存活状态进行判断
  * 登录态发生变化时，同步更新
  */
+
+import type { CurrentUserResponse } from "../types/dto/response/CurrentUserResponse";
 
 import { get } from "../api/client";
 import { authStore } from "./authStore";
@@ -20,5 +21,5 @@ export async function probeSession(): Promise<void> {
 }
 
 export function logout() {
-  window.location.href = "/login";
+  window.location.href = "/logout";
 }
