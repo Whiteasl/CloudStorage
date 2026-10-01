@@ -1,25 +1,34 @@
 import { useState } from "react";
-import { post } from "../api/client";
+import { ApiError, post } from "../api/client";
 import type { AuthResponse } from "../types/dto/response/AuthResponse";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+
+  const [error, setError] = useState<string>("");
 
   async function LoginSubmit(
     username: string,
     password: string,
   ): Promise<void> {
-    try {
-      const data = await post<AuthResponse>("/login", { username, password });
+    // 清空错误信息
+    setError("");
 
-      localStorage.setItem("token", data.token);
+    try {
+      await post<AuthResponse>("/login", { username, password });
+
       navigate("/files");
-    } catch (error) {
-      console.log("错误：" + error);
+    } catch (e) {
+      console.log("错误：" + e);
+      if (e instanceof ApiError && e.status === 401) {
+        setError("账号或密码错误，请检查后重试");
+      } else {
+        setError("无法登录，请重试");
+      }
     }
   }
 
@@ -49,6 +58,8 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
+
+        {error && <p className="error-state">{error}</p>}
 
         <button type="submit">登录</button>
         <Link to="/register" className="auth-link">
