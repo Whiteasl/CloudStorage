@@ -29,7 +29,7 @@ function setState(next: AuthState) {
 }
 
 // 提供给外部的订阅函数
-export function subscribe(listener: () => void) {
+function subscribe(listener: () => void) {
   listeners.add(listener);
 
   return () => {
@@ -38,7 +38,7 @@ export function subscribe(listener: () => void) {
 }
 
 // 提供给外部获取快照的函数
-export function getSnapshot() {
+function getSnapshot() {
   /*
   直接返回 state 变量
   返回 {...state} 或 {state, user} 会导致每次产生新对象时， React 都重复刷新
