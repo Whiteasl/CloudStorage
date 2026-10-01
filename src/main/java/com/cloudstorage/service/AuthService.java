@@ -9,10 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.cloudstorage.model.dto.Request.LoginRequest;
-import com.cloudstorage.model.dto.Response.AuthResponse;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
-import com.cloudstorage.util.JwtTokenUtil;
 
 /**
  * AuthService
@@ -20,24 +18,21 @@ import com.cloudstorage.util.JwtTokenUtil;
 @Service
 public class AuthService {
     private final AuthenticationManager authenticatorManager;
-    private final JwtTokenUtil jwtTokenUtil;
     private final UserRepository userRepository;
 
-    public AuthService(AuthenticationManager authenticationManager, JwtTokenUtil jwtTokenUtil,
-            UserRepository userRepository) {
+    public AuthService(AuthenticationManager authenticationManager, UserRepository userRepository) {
         this.authenticatorManager = authenticationManager;
-        this.jwtTokenUtil = jwtTokenUtil;
         this.userRepository = userRepository;
     }
 
     /**
-     * 登录验证
+     * 验证凭据，返回用户实体
      * 
      * @param request 获取请求体
-     * @return 登录成功则把令牌写入 Auth 中
+     * @return User - 返回用户实体
      * 
      */
-    public AuthResponse login(LoginRequest request) {
+    public User login(LoginRequest request) {
         UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                 request.getUsername(),
                 request.getPassword());
@@ -49,11 +44,10 @@ public class AuthService {
         Optional<User> userOptional = userRepository.findByUsername(request.getUsername());
         // 获取用户对象
         User user = userOptional.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
-        String token = jwtTokenUtil.generateToken(user); // 生成令牌
 
-        // 返回一个 AuthResponse，方便 AuthController
-        // 直接获取ResponseEntity
-        return new AuthResponse(user.getUsername(), token, user.getRole());
+        // 返回经过验证的用户实体
+        // 发放 Token 交给 AuthCookieService
+        return user;
     }
 
 }

@@ -88,4 +88,16 @@ public class UserService {
     public boolean existsByUsername(String username) {
         return userRepository.existsByUsername(username);
     }
+
+    /**
+     * 根据用户ID查找用户
+     * 找不到用户时，抛出 404 错误，并要求用户重新登录
+     * 
+     * @param userId Long - 用户ID
+     * @return User - 查找到的用户
+     */
+    public User findById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户异常，请重新登录"));
+    }
 }

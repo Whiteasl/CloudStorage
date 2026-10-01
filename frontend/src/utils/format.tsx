@@ -1,3 +1,5 @@
+// 规范化文件大小显示
+
 export function formatSize(size: number): string {
   const sizes: string[] = ["B", "KB", "MB", "GB"];
 

@@ -7,9 +7,30 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ForgotAndResetPasswordPage from "./pages/ForgotAndResetPasswordPage";
+import { useAuth } from "./auth/authStore";
+import { useEffect } from "react";
+import { probeSession } from "./auth/session";
+
+function RequireAuth() {
+  const { status } = useAuth();
+
+  useEffect(() => {
+    if (status === "unknown") {
+      probeSession();
+    }
+  }, [status]);
+
+  switch (status) {
+    case "anonymous":
+      return <Navigate to="/login" replace />;
+    case "authenticated":
+      return <Layout />;
+    case "unknown":
+      return null;
+  }
+}
 
 function App() {
-  const token = localStorage.getItem("token");
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/files" />} />
@@ -22,7 +43,7 @@ function App() {
         element={<ForgotAndResetPasswordPage />}
       />
 
-      <Route element={token ? <Layout /> : <Navigate to="/login" />}>
+      <Route element={<RequireAuth />}>
         <Route path="/files" element={<FilesPage />} />
         <Route path="/share" element={<SharePage />} />
         {/* <Route path="/reset-password" element={<ResetPasswordPage />} /> */}

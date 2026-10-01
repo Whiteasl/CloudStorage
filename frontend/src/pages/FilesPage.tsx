@@ -225,6 +225,8 @@ export default function FilesPage() {
       switch (error.status) {
         case 400:
           return alert("请求参数有误");
+        case 401:
+          return alert("登录过期，请重新登录");
         case 429:
           return alert("请求过于频繁，请稍后再试");
         default:
