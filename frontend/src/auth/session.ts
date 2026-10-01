@@ -5,7 +5,7 @@
 
 import type { CurrentUserResponse } from "../types/dto/response/CurrentUserResponse";
 
-import { get } from "../api/client";
+import { BASE_URL, get } from "../api/client";
 import { authStore } from "./authStore";
 
 // 探测登录态
@@ -21,5 +21,5 @@ export async function probeSession(): Promise<void> {
 }
 
 export function logout() {
-  window.location.href = "/logout";
+  window.location.href = `${BASE_URL}/logout`;
 }

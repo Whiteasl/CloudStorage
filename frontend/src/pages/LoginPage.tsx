@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ApiError, post } from "../api/client";
 import type { AuthResponse } from "../types/dto/response/AuthResponse";
 import { Link, useNavigate } from "react-router-dom";
+import { probeSession } from "../auth/session";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ export default function LoginPage() {
 
     try {
       await post<AuthResponse>("/login", { username, password });
+
+      await probeSession();
 
       navigate("/files");
     } catch (e) {
