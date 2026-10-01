@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { ShareLinkResponse } from "../types/dto/response/ShareLinkResponse";
-import { get } from "../api/client";
+import { BASE_URL, get } from "../api/client";
 import { formatSize } from "../utils/format";
 
 export default function ShareAccessPage() {
@@ -20,7 +20,7 @@ export default function ShareAccessPage() {
   // 重加载检测
   useEffect(() => {
     // 页面加载时获取信息
-    get<ShareLinkResponse>(`/api/Share/${code}/info`)
+    get<ShareLinkResponse>(`${BASE_URL}/Share/${code}/info`)
       .then(setShareInfo)
       .catch(() => setError("链接无效或已过期"))
       .finally(() => setLoading(false));
@@ -37,7 +37,7 @@ export default function ShareAccessPage() {
             <p>大小：{formatSize(shareInfo.fileSize)}</p>
             <p>过期时间：{new Date(shareInfo.expiredTime).toLocaleString()}</p>
           </div>
-          <a href={`/api/Share/${code}`} className="download-link" download>
+          <a href={`${BASE_URL}/Share/${code}`} className="download-link" download>
             下载文件
           </a>
         </>
