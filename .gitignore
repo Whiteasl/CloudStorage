@@ -37,3 +37,5 @@ log
 !./README.md
 /docs/
 data/*.db
+.env
+

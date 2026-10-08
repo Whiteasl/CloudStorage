@@ -19,6 +19,23 @@ services:
     ports:
       - "3306:3306"
 
+  mail:
+    build: ./mail-service-go
+    restart: unless-stopped
+    environment:
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_WORKERS: ${MAIL_WORKERS}
+      SERVER_PORT: "8081"
+      AUTH_TOKEN: ${MAIL_AUTH_TOKEN}
+      LANGUAGE: ${MAIL_LANGUAGE:-zh}
+
+  redis:
+    image: redis:7-alpine
+
   app:
     build: .
     ports:
@@ -30,6 +47,11 @@ services:
       DB_PASSWORD: cloudpass
       DATA_DIR: /app/data
       STORAGE_ROOT: /app/data/storage
+      MAIL_SERVER_URL: http://mail:8081/send
+      MAIL_AUTH_TOKEN: ${MAIL_AUTH_TOKEN}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
 
     volumes:
       - ${DATA_DIR:-/opt/cloudstorage/data}/storage:/app/data/storage
@@ -37,3 +59,5 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mail:
+        condition: service_started
