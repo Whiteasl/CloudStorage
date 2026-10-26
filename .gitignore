@@ -35,9 +35,9 @@ build/
 *.md
 log
 !./README.md
-/docs/
 data/*.db
 .env
+/docs/*
 !/docs/api.md
 
 
