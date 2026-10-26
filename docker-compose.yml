@@ -47,7 +47,7 @@ services:
       DB_PASSWORD: cloudpass
       DATA_DIR: /app/data
       STORAGE_ROOT: /app/data/storage
-      MAIL_SERVER_URL: http://mail:8081/send
+      MAIL_SERVICE_URL: http://mail:8081/send
       MAIL_AUTH_TOKEN: ${MAIL_AUTH_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_HOST: redis

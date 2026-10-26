@@ -1,5 +1,7 @@
 package com.cloudstorage;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +19,8 @@ import org.springframework.web.context.WebApplicationContext;
 import com.cloudstorage.model.entity.User;
 import com.cloudstorage.repository.UserRepository;
 import com.cloudstorage.security.AuthCookieService;
+import com.cloudstorage.service.StorageService;
+import com.cloudstorage.util.FileUtils;
 import com.cloudstorage.util.JwtTokenUtil;
 
 import jakarta.servlet.http.Cookie;
@@ -42,6 +46,10 @@ public class AuthCookieIntegrationTest {
   private AuthCookieService authCookieService;
   @Autowired
   private JwtTokenUtil jwtTokenUtil;
+  @Autowired
+  private StorageService storageService;
+  @Autowired
+  private FileUtils fileUtils;
 
   private MockMvc mockMvc;
 
@@ -69,7 +77,14 @@ public class AuthCookieIntegrationTest {
   @AfterEach
   void cleanUp() {
 
-    userRepository.findByUsername(username).ifPresent(userRepository::delete);
+    userRepository.findByUsername(username).ifPresent(user -> {
+      try {
+        fileUtils.deleteRecursively(storageService.getUserPath(user.getId()));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      userRepository.delete(user);
+    });
   }
 
   /**
@@ -250,6 +265,10 @@ public class AuthCookieIntegrationTest {
             + this.email + "\"}"))
         .andExpect(status().isCreated())
         .andExpect(header().exists(HttpHeaders.SET_COOKIE)).andReturn();
+
+    // 注册成功后必须初始化用户存储目录，否则首次上传 / 建文件夹会失败
+    User registeredUser = userRepository.findByUsername(this.username).orElseThrow();
+    assertThat(Files.isDirectory(storageService.getUserPath(registeredUser.getId()))).isTrue();
 
     /*
      * 登录

@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.cloudstorage.model.dto.Request.RegisterRequest;
@@ -18,10 +19,12 @@ import com.cloudstorage.repository.UserRepository;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final StorageService storageService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, StorageService storageService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.storageService = storageService;
     }
 
     /**
@@ -30,6 +33,7 @@ public class UserService {
      * @param request 注册请求题
      * @return 返回一个 User 实体
      */
+    @Transactional
     public User registerUser(RegisterRequest request) {
         boolean result = false; // 存储返回值
 
@@ -55,8 +59,12 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(password)); // 把密码进行加密，然后再存入数据库中
         user.setEmail(email);
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
+        // 用户 ID 由数据库生成后才可确定存储目录；目录创建失败时回滚用户记录
+        storageService.initUserDirectory(savedUser.getId());
+
+        return savedUser;
     }
 
     /**

@@ -38,4 +38,6 @@ log
 /docs/
 data/*.db
 .env
+!/docs/api.md
+
 
